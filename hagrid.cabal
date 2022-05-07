@@ -1,0 +1,52 @@
+cabal-version: 2.2
+
+-- This file has been generated from package.yaml by hpack version 0.34.4.
+--
+-- see: https://github.com/sol/hpack
+
+name:           hagrid
+version:        0.0.1.0
+license:        WTFPL
+build-type:     Simple
+
+library
+  exposed-modules:
+      HaGrid
+  other-modules:
+      Paths_hagrid
+  hs-source-dirs:
+      src
+  default-extensions:
+      OverloadedStrings
+  ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints
+  build-depends:
+      base >=4.7 && <5
+    , containers
+    , data-default-class
+    , extra
+    , ilist
+    , lens
+    , monomer
+    , text
+  default-language: Haskell2010
+
+executable examples
+  main-is: Main.hs
+  other-modules:
+      Paths_hagrid
+  hs-source-dirs:
+      examples
+  default-extensions:
+      OverloadedStrings
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints
+  build-depends:
+      base >=4.7 && <5
+    , containers
+    , data-default-class
+    , extra
+    , hagrid
+    , ilist
+    , lens
+    , monomer
+    , text
+  default-language: Haskell2010
