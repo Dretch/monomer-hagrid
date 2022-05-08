@@ -3,12 +3,13 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Main (main) where
 
 import Data.Text (Text)
 import qualified Data.Text as T
-import HaGrid (MaybeSort (..), customColumn, haGrid, showOrdColumn, textColumn)
+import HaGrid (columnInitialWidth, customColumn, haGrid, showOrdColumn, textColumn)
 import Monomer
 import Text.Printf (printf)
 
@@ -53,11 +54,16 @@ buildUI _wenv model = grid
   where
     grid =
       haGrid
-        [ textColumn "Name" _sName 300,
-          textColumn "Species" _sSpecies 200,
-          textColumn "Date of Birth" _sDateOfBirth 200,
-          showOrdColumn "Weight (Kg)" _sWeightKilos 200,
-          customColumn "Actions" actionsColumn 100 DontSort
+        [ textColumn "Name" _sName
+            `columnInitialWidth` 300,
+          textColumn "Species" _sSpecies
+            `columnInitialWidth` 200,
+          textColumn "Date of Birth" _sDateOfBirth
+            `columnInitialWidth` 200,
+          showOrdColumn "Weight (Kg)" _sWeightKilos
+            `columnInitialWidth` 200,
+          customColumn "Actions" actionsColumn
+            `columnInitialWidth` 100
         ]
         (_appSpiders model)
     actionsColumn spdr =
@@ -66,4 +72,4 @@ buildUI _wenv model = grid
 handleEvent :: EventHandler AppModel AppEvent sp ep
 handleEvent _wenv _node _model = \case
   FeedSpider name ->
-    [ Producer (const (putStrLn ("Feeding spider " <> T.unpack name))) ]
+    [Producer (const (putStrLn ("Feeding spider " <> T.unpack name)))]

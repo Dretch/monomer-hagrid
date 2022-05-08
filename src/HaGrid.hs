@@ -10,13 +10,16 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 
--- todo: hide ColumnDef ctor
 module HaGrid
-  ( MaybeSort (..),
+  ( ColumnDef,
+    ColumnSortKey (..),
     haGrid,
     textColumn,
     showOrdColumn,
-    customColumn
+    customColumn,
+    columnInitialWidth,
+    columnMinWidth,
+    columnSortKey,
   )
 where
 
@@ -51,15 +54,15 @@ data ColumnDef e a where
   ColumnDef ::
     { _cdName :: Text,
       _cdWidget :: a -> WidgetNode (HaGridModel a) (HaGridEvent e),
-      _cdSortKey :: MaybeSort a,
+      _cdSortKey :: ColumnSortKey a,
       _cdInitialWidth :: Int,
       _cdMinWidth :: Int
     } ->
     ColumnDef e a
 
-data MaybeSort a where
-  DontSort :: MaybeSort a
-  SortWith :: Ord b => (a -> b) -> MaybeSort a
+data ColumnSortKey a where
+  DontSort :: ColumnSortKey a
+  SortWith :: Ord b => (a -> b) -> ColumnSortKey a
 
 data HaGridModel a = HaGridModel
   { _mSortedItems :: [a],
@@ -114,7 +117,7 @@ haGrid columnDefs items = widget
             btn = headerButton i columnDef
             handle = headerDragHandle i columnDef columnWidth
         childWidgetRows =
-          [[_cdWidget item | ColumnDef{_cdWidget} <- columnDefs] | item <- _mSortedItems]
+          [[_cdWidget item | ColumnDef {_cdWidget} <- columnDefs] | item <- _mSortedItems]
 
         nRows = length items
         nCols = length columnDefs
@@ -235,7 +238,7 @@ haGrid columnDefs items = widget
     handleEvent :: [ColumnDef ep a] -> EventHandler (HaGridModel a) (HaGridEvent ep) sp ep
     handleEvent columnDefs wenv _node model = \case
       OrderByColumn colIndex
-        | Just ColumnDef{_cdSortKey = DontSort} <- columnDefs !? colIndex ->
+        | Just ColumnDef {_cdSortKey = DontSort} <- columnDefs !? colIndex ->
             []
         | Just c <- (model ^. sortColumn),
           c == colIndex ->
@@ -281,38 +284,50 @@ accentColor wenv = transColor
     color = fromMaybe (rgb 255 255 255) (_sstText style >>= _txsFontColor)
     transColor = color {_colorA = 0.7}
 
-textColumn :: Text -> (a -> Text) -> Int -> ColumnDef e a
-textColumn _cdName get _cdInitialWidth =
+textColumn :: Text -> (a -> Text) -> ColumnDef e a
+textColumn _cdName get =
   ColumnDef
     { _cdName,
       _cdWidget = \item -> label_ (get item) [ellipsis],
-      _cdInitialWidth,
+      _cdInitialWidth = defaultColumnInitialWidth,
       _cdSortKey = SortWith get,
-      _cdMinWidth = defaultMinColumnWidth
+      _cdMinWidth = defaultColumnMinWidth
     }
 
-showOrdColumn :: (Show b, Ord b) => Text -> (a -> b) -> Int -> ColumnDef e a
-showOrdColumn _cdName get _cdInitialWidth =
+showOrdColumn :: (Show b, Ord b) => Text -> (a -> b) -> ColumnDef e a
+showOrdColumn _cdName get =
   ColumnDef
     { _cdName,
       _cdWidget = \item -> label_ ((T.pack . show . get) item) [ellipsis],
-      _cdInitialWidth,
+      _cdInitialWidth = defaultColumnInitialWidth,
       _cdSortKey = SortWith get,
-      _cdMinWidth = defaultMinColumnWidth
+      _cdMinWidth = defaultColumnMinWidth
     }
 
-customColumn :: (Typeable a, Eq a, WidgetEvent e) => Text -> (forall s. a -> WidgetNode s e) -> Int -> MaybeSort a -> ColumnDef e a
-customColumn _cdName get _cdInitialWidth _cdSortKey =
+customColumn :: (Typeable a, Eq a, WidgetEvent e) => Text -> (forall s. a -> WidgetNode s e) -> ColumnDef e a
+customColumn _cdName get =
   ColumnDef
     { _cdName,
       _cdWidget = customColumnWidget get,
-      _cdInitialWidth,
-      _cdSortKey,
-      _cdMinWidth = defaultMinColumnWidth
+      _cdInitialWidth = defaultColumnInitialWidth,
+      _cdSortKey = DontSort,
+      _cdMinWidth = defaultColumnMinWidth
     }
 
-defaultMinColumnWidth :: Int
-defaultMinColumnWidth = 60
+columnInitialWidth :: ColumnDef e a -> Int -> ColumnDef e a
+columnInitialWidth c w = c {_cdInitialWidth = w}
+
+columnMinWidth :: ColumnDef e a -> Int -> ColumnDef e a
+columnMinWidth c w = c {_cdMinWidth = w}
+
+columnSortKey :: ColumnDef e a -> ColumnSortKey a -> ColumnDef e a
+columnSortKey c k = c {_cdSortKey = k}
+
+defaultColumnInitialWidth :: Int
+defaultColumnInitialWidth = 100
+
+defaultColumnMinWidth :: Int
+defaultColumnMinWidth = 60
 
 customColumnWidget ::
   forall ep a.
@@ -417,11 +432,11 @@ sortItems :: [ColumnDef ep a] -> HaGridModel a -> HaGridModel a
 sortItems columnDefs model
   | Just sc <- model ^. sortColumn,
     Just ColumnDef {_cdSortKey = SortWith f} <- columnDefs !? sc =
-     if model ^. sortReverse
+      if model ^. sortReverse
         then model & sortedItems %~ List.sortOn (Down . f)
         else model & sortedItems %~ List.sortOn f
   | otherwise =
-     model
+      model
 
 cellSizes :: Seq SizeReq -> Double -> Seq Double
 cellSizes reqs available = reqResult <$> reqs
