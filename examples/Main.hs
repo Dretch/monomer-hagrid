@@ -1,4 +1,3 @@
-{-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
@@ -45,7 +44,7 @@ main = startApp model handleEvent buildUI config
       Spider
         { _sSpecies = "Acromantula",
           _sName = T.pack (printf "Son of Aragog %d" i),
-          _sDateOfBirth = T.pack (printf "1942-04-%02d" i),
+          _sDateOfBirth = T.pack (printf "1942-04-%2d" i),
           _sWeightKilos = i * 2
         }
 
