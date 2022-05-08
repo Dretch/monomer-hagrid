@@ -9,7 +9,7 @@ module Main (main) where
 
 import Data.Text (Text)
 import qualified Data.Text as T
-import HaGrid (haGrid, showOrdColumn, textColumn)
+import HaGrid (MaybeSort (..), customColumn, haGrid, showOrdColumn, textColumn)
 import Monomer
 import Text.Printf (printf)
 
@@ -18,7 +18,8 @@ newtype AppModel = AppModel
   }
   deriving (Eq, Show)
 
-data AppEvent
+newtype AppEvent
+  = FeedSpider Text
 
 data Spider = Spider
   { _sSpecies :: Text,
@@ -56,9 +57,14 @@ buildUI _wenv model = grid
         [ textColumn "Name" _sName 300,
           textColumn "Species" _sSpecies 200,
           textColumn "Date of Birth" _sDateOfBirth 200,
-          showOrdColumn "Weight (Kg)" _sWeightKilos 200
+          showOrdColumn "Weight (Kg)" _sWeightKilos 200,
+          customColumn "Actions" actionsColumn 100 DontSort
         ]
         (_appSpiders model)
+    actionsColumn spdr =
+      button "Feed" (FeedSpider (_sName spdr))
 
 handleEvent :: EventHandler AppModel AppEvent sp ep
-handleEvent _wenv _node _model = \case {}
+handleEvent _wenv _node _model = \case
+  FeedSpider name ->
+    [ Producer (const (putStrLn ("Feeding spider " <> T.unpack name))) ]

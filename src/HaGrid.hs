@@ -10,11 +10,13 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 
+-- todo: hide ColumnDef ctor
 module HaGrid
-  ( ColumnDef,
+  ( MaybeSort (..),
     haGrid,
     textColumn,
     showOrdColumn,
+    customColumn
   )
 where
 
@@ -40,16 +42,24 @@ import qualified Monomer.Lens as L
 import Monomer.Widgets.Container
 import Monomer.Widgets.Single
 
-data ColumnDef a where
+data HaGridEvent ep
+  = OrderByColumn Int
+  | ResizeColumn Int Int
+  | ParentEvent ep
+
+data ColumnDef e a where
   ColumnDef ::
-    Ord b =>
     { _cdName :: Text,
-      _cdDisplay :: a -> Text,
-      _cdSortKey :: Maybe (a -> b),
+      _cdWidget :: a -> WidgetNode (HaGridModel a) (HaGridEvent e),
+      _cdSortKey :: MaybeSort a,
       _cdInitialWidth :: Int,
       _cdMinWidth :: Int
     } ->
-    ColumnDef a
+    ColumnDef e a
+
+data MaybeSort a where
+  DontSort :: MaybeSort a
+  SortWith :: Ord b => (a -> b) -> MaybeSort a
 
 data HaGridModel a = HaGridModel
   { _mSortedItems :: [a],
@@ -67,11 +77,8 @@ data HeaderDragHandleState = HeaderDragHandleState
   }
   deriving (Eq, Show)
 
-data HaGridEvent
-  = OrderByColumn Int
-  | ResizeColumn Int Int
-
-haGrid :: forall a s e. (Typeable a, Eq a, WidgetModel s, WidgetEvent e) => [ColumnDef a] -> [a] -> WidgetNode s e
+-- todo: allow padding to be configurable (per cell? for custom cells?)
+haGrid :: forall a s e. (Typeable a, Eq a, WidgetModel s, WidgetEvent e) => [ColumnDef e a] -> [a] -> WidgetNode s e
 haGrid columnDefs items = widget
   where
     widget =
@@ -82,7 +89,7 @@ haGrid columnDefs items = widget
         (handleEvent columnDefs)
         []
 
-    buildUI :: UIBuilder (HaGridModel a) HaGridEvent
+    buildUI :: UIBuilder (HaGridModel a) (HaGridEvent e)
     buildUI _wenv HaGridModel {..} = tree
       where
         tree =
@@ -107,7 +114,7 @@ haGrid columnDefs items = widget
             btn = headerButton i columnDef
             handle = headerDragHandle i columnDef columnWidth
         childWidgetRows =
-          [[cellWidget cd item | cd <- columnDefs] | item <- _mSortedItems]
+          [[_cdWidget item | ColumnDef{_cdWidget} <- columnDefs] | item <- _mSortedItems]
 
         nRows = length items
         nCols = length columnDefs
@@ -225,9 +232,11 @@ haGrid columnDefs items = widget
             indL = l + colOffset - indW - pad
             indRect = Rect indL indT indW indW
 
-    handleEvent :: [ColumnDef a] -> EventHandler (HaGridModel a) HaGridEvent sp ep
+    handleEvent :: [ColumnDef ep a] -> EventHandler (HaGridModel a) (HaGridEvent ep) sp ep
     handleEvent columnDefs wenv _node model = \case
       OrderByColumn colIndex
+        | Just ColumnDef{_cdSortKey = DontSort} <- columnDefs !? colIndex ->
+            []
         | Just c <- (model ^. sortColumn),
           c == colIndex ->
             [Model (sortItems columnDefs (model & sortReverse %~ not))]
@@ -238,9 +247,11 @@ haGrid columnDefs items = widget
           Request (ResizeWidgets headerPaneId),
           Request (ResizeWidgets contentPaneId)
         ]
-        where
-          headerPaneId = fromJust (widgetIdFromKey wenv (WidgetKey headerPaneKey))
-          contentPaneId = fromJust (widgetIdFromKey wenv (WidgetKey contentPaneKey))
+      ParentEvent e ->
+        [Report e]
+      where
+        headerPaneId = fromJust (widgetIdFromKey wenv (WidgetKey headerPaneKey))
+        contentPaneId = fromJust (widgetIdFromKey wenv (WidgetKey contentPaneKey))
 
 -- todo: use triangle fn from latest monomer
 drawSortIndicator :: Renderer -> Rect -> Maybe Color -> Bool -> IO ()
@@ -270,35 +281,61 @@ accentColor wenv = transColor
     color = fromMaybe (rgb 255 255 255) (_sstText style >>= _txsFontColor)
     transColor = color {_colorA = 0.7}
 
-textColumn :: Text -> (a -> Text) -> Int -> ColumnDef a
+textColumn :: Text -> (a -> Text) -> Int -> ColumnDef e a
 textColumn _cdName get _cdInitialWidth =
   ColumnDef
     { _cdName,
-      _cdDisplay = get,
+      _cdWidget = \item -> label_ (get item) [ellipsis],
       _cdInitialWidth,
-      _cdSortKey = Just get,
+      _cdSortKey = SortWith get,
       _cdMinWidth = defaultMinColumnWidth
     }
 
-showOrdColumn :: (Show b, Ord b) => Text -> (a -> b) -> Int -> ColumnDef a
+showOrdColumn :: (Show b, Ord b) => Text -> (a -> b) -> Int -> ColumnDef e a
 showOrdColumn _cdName get _cdInitialWidth =
   ColumnDef
     { _cdName,
-      _cdDisplay = T.pack . show . get,
+      _cdWidget = \item -> label_ ((T.pack . show . get) item) [ellipsis],
       _cdInitialWidth,
-      _cdSortKey = Just get,
+      _cdSortKey = SortWith get,
+      _cdMinWidth = defaultMinColumnWidth
+    }
+
+customColumn :: (Typeable a, Eq a, WidgetEvent e) => Text -> (forall s. a -> WidgetNode s e) -> Int -> MaybeSort a -> ColumnDef e a
+customColumn _cdName get _cdInitialWidth _cdSortKey =
+  ColumnDef
+    { _cdName,
+      _cdWidget = customColumnWidget get,
+      _cdInitialWidth,
+      _cdSortKey,
       _cdMinWidth = defaultMinColumnWidth
     }
 
 defaultMinColumnWidth :: Int
 defaultMinColumnWidth = 60
 
-headerButton :: Int -> ColumnDef a -> WidgetNode s HaGridEvent
+customColumnWidget ::
+  forall ep a.
+  (WidgetModel ep, Typeable a, Eq a) =>
+  (a -> forall s. WidgetNode s ep) ->
+  a ->
+  WidgetNode (HaGridModel a) (HaGridEvent ep)
+customColumnWidget get item =
+  compositeD_ "HaGrid.Cell" (WidgetValue item) buildUI handleEvent []
+  where
+    buildUI :: forall s. UIBuilder s ep
+    buildUI _wenv _model = get item
+
+    handleEvent :: forall s. EventHandler s ep (HaGridModel a) (HaGridEvent ep)
+    handleEvent _wenv _node _model e =
+      [Report (ParentEvent e)]
+
+headerButton :: WidgetEvent ep => Int -> ColumnDef ep a -> WidgetNode s (HaGridEvent ep)
 headerButton colIndex ColumnDef {_cdName, _cdSortKey, _cdMinWidth} =
   button_ _cdName (OrderByColumn colIndex) [ellipsis]
     `styleBasic` [{- todo: textFont Font.bold, -} radius 0]
 
-headerDragHandle :: Int -> ColumnDef a -> Int -> WidgetNode s HaGridEvent
+headerDragHandle :: WidgetEvent ep => Int -> ColumnDef ep a -> Int -> WidgetNode s (HaGridEvent ep)
 headerDragHandle colIndex ColumnDef {_cdName, _cdSortKey, _cdMinWidth} columnWidth = tree
   where
     tree = defaultWidgetNode "HaGrid.HeaderDragHandle" (headerDragHandleWidget Nothing)
@@ -360,11 +397,7 @@ headerDragHandle colIndex ColumnDef {_cdName, _cdSortKey, _cdMinWidth} columnWid
           where
             vp = node ^. L.info . L.viewport
 
-cellWidget :: ColumnDef a -> a -> WidgetNode s e
-cellWidget ColumnDef {_cdDisplay} item =
-  label_ (_cdDisplay item) [ellipsis]
-
-initialModel :: [ColumnDef a] -> [a] -> HaGridModel a
+initialModel :: [ColumnDef ep a] -> [a] -> HaGridModel a
 initialModel columnDefs items =
   sortItems columnDefs $
     HaGridModel
@@ -380,15 +413,15 @@ headerPaneKey = "HaGrid.headerPane"
 contentPaneKey :: Text
 contentPaneKey = "HaGrid.contentPane"
 
-sortItems :: [ColumnDef a] -> HaGridModel a -> HaGridModel a
+sortItems :: [ColumnDef ep a] -> HaGridModel a -> HaGridModel a
 sortItems columnDefs model
   | Just sc <- model ^. sortColumn,
-    Just ColumnDef {_cdSortKey = Just f} <- columnDefs !? sc =
-      if model ^. sortReverse
+    Just ColumnDef {_cdSortKey = SortWith f} <- columnDefs !? sc =
+     if model ^. sortReverse
         then model & sortedItems %~ List.sortOn (Down . f)
         else model & sortedItems %~ List.sortOn f
   | otherwise =
-      model
+     model
 
 cellSizes :: Seq SizeReq -> Double -> Seq Double
 cellSizes reqs available = reqResult <$> reqs
