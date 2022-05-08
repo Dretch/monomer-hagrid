@@ -111,8 +111,8 @@ haGrid columnDefs items = widget
             & L.children .~ S.fromList (mconcat childWidgetRows)
 
         headerWidgets =
-          foldMap (\(a, b) -> [a, b]) $ izipWith headerWidgetPair columnDefs _mColumnWidths
-        headerWidgetPair i columnDef columnWidth = (btn, handle)
+          mconcat (izipWith headerWidgetPair columnDefs _mColumnWidths)
+        headerWidgetPair i columnDef columnWidth = [btn, handle]
           where
             btn = headerButton i columnDef
             handle = headerDragHandle i columnDef columnWidth
