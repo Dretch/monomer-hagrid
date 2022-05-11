@@ -129,8 +129,6 @@ haGrid columnDefs items = widget
         dragHandleWidth = 4
         dragHandleHeight = 32
 
-        wReqs = S.fromList (fixedSize . fromIntegral <$> _mColumnWidths)
-
         contentPaneContainer =
           createContainer
             _mColumnWidths
@@ -142,18 +140,16 @@ haGrid columnDefs items = widget
 
         contentGetSizeReq _wenv _node children = (w, h)
           where
-            hReqs = toRowHeights children columnDefsSeq
-            w = foldl' sizeReqMergeSum (fixedSize 0) wReqs
-            h = foldl' sizeReqMergeSum (fixedSize 0) hReqs
+            w = fixedSize (fromIntegral (sum _mColumnWidths))
+            h = fixedSize (sum (toRowHeights children columnDefsSeq))
 
         contentResize wenv node viewport children = (resultNode node, assignedAreas)
           where
             style = currentStyle wenv node
-            Rect l t _w h = fromMaybe def (removeOuterBounds style viewport)
+            Rect l t _w _h = fromMaybe def (removeOuterBounds style viewport)
 
-            hReqs = toRowHeights children columnDefsSeq
             colXs = sizesToPositions (S.fromList (fromIntegral <$> _mColumnWidths))
-            rowYs = sizesToPositions (cellSizes hReqs h)
+            rowYs = sizesToPositions (toRowHeights children columnDefsSeq)
 
             assignedAreas = S.fromList $ do
               row <- [0 .. nRows - 1]
@@ -181,16 +177,15 @@ haGrid columnDefs items = widget
             renderLine renderer (Point l (t + rowY)) (Point (l + lastColX) (t + rowY))
             stroke renderer
           where
-            hReqs = toRowHeights (node ^. L.children) columnDefsSeq
             colXs = sizesToPositions (S.fromList (fromIntegral <$> _mColumnWidths))
-            rowYs = sizesToPositions (cellSizes hReqs h)
+            rowYs = sizesToPositions (toRowHeights (node ^. L.children) columnDefsSeq)
             lastColX
               | _ :> a <- S.viewr colXs = a
               | otherwise = 0
             lastRowY
               | _ :> a <- S.viewr rowYs = a
               | otherwise = 0
-            Rect l t _w h = node ^. L.info . L.viewport
+            Rect l t _w _h = node ^. L.info . L.viewport
 
         headerPaneContainer =
           createContainer
@@ -455,38 +450,14 @@ sortItems columnDefs model
   | otherwise =
       model
 
-cellSizes :: Seq SizeReq -> Double -> Seq Double
-cellSizes reqs available = reqResult <$> reqs
-  where
-    totalFixed = sum $ _szrFixed <$> reqs
-    totalFlex = sum $ _szrFlex <$> reqs
-    totalWeightedFlex = sum $ (\r -> _szrFlex r * _szrFactor r) <$> reqs
-    totalWeightedExtra = sum $ (\r -> _szrExtra r * _szrFactor r) <$> reqs
-
-    availableFlex = max 0 $ min (available - totalFixed) totalFlex
-    availableExtra = available - totalFixed - availableFlex
-
-    reqResult r
-      | availableFlex >= totalFlex =
-          if availableExtra > 0 && totalWeightedExtra > 0
-            then
-              let extraProp = _szrExtra r * _szrFactor r / totalWeightedExtra
-               in _szrFixed r + _szrFlex r + availableExtra * extraProp
-            else _szrFixed r + _szrFlex r
-      | totalWeightedFlex > 0 =
-          let flexProp = _szrFlex r * _szrFactor r / totalWeightedFlex
-           in _szrFixed r + availableFlex * flexProp
-      | otherwise =
-          _szrFixed r
-
 sizesToPositions :: Seq Double -> Seq Double
 sizesToPositions = S.scanl (+) 0
 
-toRowHeights :: Seq (WidgetNode s e1) -> Seq (ColumnDef e2 a) -> Seq SizeReq
+toRowHeights :: Seq (WidgetNode s e1) -> Seq (ColumnDef e2 a) -> Seq Double
 toRowHeights children columnDefs = mergeHeights <$> S.chunksOf (length columnDefs) children
   where
     mergeHeights rowWidgets =
-      fixedSize (foldl' max 0 (S.zipWith widgetHeight columnDefs rowWidgets))
+      foldl' max 0 (S.zipWith widgetHeight columnDefs rowWidgets)
 
     widgetHeight ColumnDef{_cdPaddingH} widget =
       widget
