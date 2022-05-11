@@ -20,6 +20,9 @@ module HaGrid
     columnInitialWidth,
     columnMinWidth,
     columnSortKey,
+    columnPadding,
+    columnPaddingW,
+    columnPaddingH
   )
 where
 
@@ -31,7 +34,7 @@ import Data.Default.Class as X (def)
 import Data.Foldable (foldl')
 import qualified Data.List as List
 import Data.List.Extra as X ((!?))
-import Data.List.Index (izipWith, setAt)
+import Data.List.Index (izipWith, setAt, indexed)
 import Data.Maybe (fromJust)
 import Data.Maybe as X (fromMaybe)
 import Data.Ord (Down (Down))
@@ -56,7 +59,9 @@ data ColumnDef e a where
       _cdWidget :: a -> WidgetNode (HaGridModel a) (HaGridEvent e),
       _cdSortKey :: ColumnSortKey a,
       _cdInitialWidth :: Int,
-      _cdMinWidth :: Int
+      _cdMinWidth :: Int,
+      _cdPaddingW :: Double,
+      _cdPaddingH :: Double
     } ->
     ColumnDef e a
 
@@ -80,7 +85,6 @@ data HeaderDragHandleState = HeaderDragHandleState
   }
   deriving (Eq, Show)
 
--- todo: allow padding to be configurable (per cell? for custom cells?)
 haGrid :: forall a s e. (Typeable a, Eq a, WidgetModel s, WidgetEvent e) => [ColumnDef e a] -> [a] -> WidgetNode s e
 haGrid columnDefs items = widget
   where
@@ -120,13 +124,10 @@ haGrid columnDefs items = widget
           [[_cdWidget item | ColumnDef {_cdWidget} <- columnDefs] | item <- _mSortedItems]
 
         nRows = length items
-        nCols = length columnDefs
+        columnDefsSeq = S.fromList columnDefs
 
         dragHandleWidth = 4
         dragHandleHeight = 32
-        paddingW = 10
-        paddingH = 10
-        paddingTotalH = fromIntegral nRows * paddingH * 2
 
         wReqs = S.fromList (fixedSize . fromIntegral <$> _mColumnWidths)
 
@@ -141,30 +142,30 @@ haGrid columnDefs items = widget
 
         contentGetSizeReq _wenv _node children = (w, h)
           where
-            hReqs = toRowHeights children nCols
+            hReqs = toRowHeights children columnDefsSeq
             w = foldl' sizeReqMergeSum (fixedSize 0) wReqs
-            h = foldl' sizeReqMergeSum (fixedSize 0) hReqs & L.fixed %~ (+ paddingTotalH)
+            h = foldl' sizeReqMergeSum (fixedSize 0) hReqs
 
         contentResize wenv node viewport children = (resultNode node, assignedAreas)
           where
             style = currentStyle wenv node
             Rect l t _w h = fromMaybe def (removeOuterBounds style viewport)
 
-            hReqs = toRowHeights children nCols
+            hReqs = toRowHeights children columnDefsSeq
             colXs = sizesToPositions (S.fromList (fromIntegral <$> _mColumnWidths))
-            rowYs = sizesToPositions (cellSizes hReqs (h - paddingTotalH))
+            rowYs = sizesToPositions (cellSizes hReqs h)
 
             assignedAreas = S.fromList $ do
               row <- [0 .. nRows - 1]
-              col <- [0 .. nCols - 1]
-              pure (assignArea col row)
+              (col, columnDef) <- indexed columnDefs
+              pure (assignArea col columnDef row)
 
-            assignArea col row = Rect chX chY chW chH
+            assignArea col ColumnDef{_cdPaddingW, _cdPaddingH} row = Rect chX chY chW chH
               where
-                chX = l + S.index colXs col + paddingW
-                chY = t + S.index rowYs row + paddingH * (fromIntegral row * 2 + 1)
-                chW = S.index colXs (col + 1) - S.index colXs col - paddingW * 2
-                chH = S.index rowYs (row + 1) - S.index rowYs row
+                chX = l + S.index colXs col + _cdPaddingW
+                chY = t + S.index rowYs row + _cdPaddingH
+                chW = S.index colXs (col + 1) - S.index colXs col - _cdPaddingW * 2
+                chH = S.index rowYs (row + 1) - S.index rowYs row - _cdPaddingH * 2
 
         contentRenderAfter wenv node renderer = do
           setStrokeColor renderer (accentColor wenv)
@@ -174,22 +175,20 @@ haGrid columnDefs items = widget
             beginPath renderer
             renderLine renderer (Point (l + colX) t) (Point (l + colX) (t + lastRowY))
             stroke renderer
-
-          void $
-            flip S.traverseWithIndex (S.drop 1 rowYs) $ \row rowY -> do
-              beginPath renderer
-              let y = t + rowY + paddingH * (fromIntegral (row + 1) * 2)
-              renderLine renderer (Point l y) (Point (l + lastColX) y)
-              stroke renderer
+          
+          forM_ (S.drop 1 rowYs) $ \rowY -> do
+            beginPath renderer
+            renderLine renderer (Point l (t + rowY)) (Point (l + lastColX) (t + rowY))
+            stroke renderer
           where
-            hReqs = toRowHeights (node ^. L.children) nCols
+            hReqs = toRowHeights (node ^. L.children) columnDefsSeq
             colXs = sizesToPositions (S.fromList (fromIntegral <$> _mColumnWidths))
-            rowYs = sizesToPositions (cellSizes hReqs (h - paddingTotalH))
+            rowYs = sizesToPositions (cellSizes hReqs h)
             lastColX
               | _ :> a <- S.viewr colXs = a
               | otherwise = 0
             lastRowY
-              | _ :> a <- S.viewr rowYs = a + paddingTotalH
+              | _ :> a <- S.viewr rowYs = a
               | otherwise = 0
             Rect l t _w h = node ^. L.info . L.viewport
 
@@ -291,7 +290,9 @@ textColumn _cdName get =
       _cdWidget = \item -> label_ (get item) [ellipsis],
       _cdInitialWidth = defaultColumnInitialWidth,
       _cdSortKey = SortWith get,
-      _cdMinWidth = defaultColumnMinWidth
+      _cdMinWidth = defaultColumnMinWidth,
+      _cdPaddingW = defaultColumnPadding,
+      _cdPaddingH = defaultColumnPadding
     }
 
 showOrdColumn :: (Show b, Ord b) => Text -> (a -> b) -> ColumnDef e a
@@ -301,7 +302,9 @@ showOrdColumn _cdName get =
       _cdWidget = \item -> label_ ((T.pack . show . get) item) [ellipsis],
       _cdInitialWidth = defaultColumnInitialWidth,
       _cdSortKey = SortWith get,
-      _cdMinWidth = defaultColumnMinWidth
+      _cdMinWidth = defaultColumnMinWidth,
+      _cdPaddingW = defaultColumnPadding,
+      _cdPaddingH = defaultColumnPadding
     }
 
 customColumn :: (Typeable a, Eq a, WidgetEvent e) => Text -> (forall s. a -> WidgetNode s e) -> ColumnDef e a
@@ -311,7 +314,9 @@ customColumn _cdName get =
       _cdWidget = customColumnWidget get,
       _cdInitialWidth = defaultColumnInitialWidth,
       _cdSortKey = DontSort,
-      _cdMinWidth = defaultColumnMinWidth
+      _cdMinWidth = defaultColumnMinWidth,
+      _cdPaddingW = defaultColumnPadding,
+      _cdPaddingH = defaultColumnPadding
     }
 
 columnInitialWidth :: ColumnDef e a -> Int -> ColumnDef e a
@@ -323,11 +328,23 @@ columnMinWidth c w = c {_cdMinWidth = w}
 columnSortKey :: ColumnDef e a -> ColumnSortKey a -> ColumnDef e a
 columnSortKey c k = c {_cdSortKey = k}
 
+columnPadding :: ColumnDef e a -> Double -> ColumnDef e a
+columnPadding c p = columnPaddingH (columnPaddingW c p) p
+
+columnPaddingW :: ColumnDef e a -> Double -> ColumnDef e a
+columnPaddingW c p = c { _cdPaddingW = p }
+
+columnPaddingH :: ColumnDef e a -> Double -> ColumnDef e a
+columnPaddingH c p = c { _cdPaddingH = p }
+
 defaultColumnInitialWidth :: Int
 defaultColumnInitialWidth = 100
 
 defaultColumnMinWidth :: Int
 defaultColumnMinWidth = 60
+
+defaultColumnPadding :: Double
+defaultColumnPadding = 10
 
 customColumnWidget ::
   forall ep a.
@@ -465,8 +482,15 @@ cellSizes reqs available = reqResult <$> reqs
 sizesToPositions :: Seq Double -> Seq Double
 sizesToPositions = S.scanl (+) 0
 
-toRowHeights :: Seq (WidgetNode s e) -> Int -> Seq SizeReq
-toRowHeights children nCols = mergeHeights <$> S.chunksOf nCols children
+toRowHeights :: Seq (WidgetNode s e1) -> Seq (ColumnDef e2 a) -> Seq SizeReq
+toRowHeights children columnDefs = mergeHeights <$> S.chunksOf (length columnDefs) children
   where
-    mergeHeights widgets =
-      foldl' sizeReqMergeMax (fixedSize 0) (_wniSizeReqH . _wnInfo <$> widgets)
+    mergeHeights rowWidgets =
+      fixedSize (foldl' max 0 (S.zipWith widgetHeight columnDefs rowWidgets))
+
+    widgetHeight ColumnDef{_cdPaddingH} widget =
+      widget
+        & _wnInfo
+        & _wniSizeReqH
+        & _szrFixed
+        & (+ (_cdPaddingH * 2))

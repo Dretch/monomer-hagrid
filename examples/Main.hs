@@ -9,7 +9,7 @@ module Main (main) where
 
 import Data.Text (Text)
 import qualified Data.Text as T
-import HaGrid (columnInitialWidth, customColumn, haGrid, showOrdColumn, textColumn)
+import HaGrid (columnInitialWidth, customColumn, haGrid, showOrdColumn, textColumn, columnPadding)
 import Monomer
 import Text.Printf (printf)
 
@@ -64,6 +64,7 @@ buildUI _wenv model = grid
             `columnInitialWidth` 200,
           customColumn "Actions" actionsColumn
             `columnInitialWidth` 100
+            `columnPadding` 5
         ]
         (_appSpiders model)
     actionsColumn spdr =
