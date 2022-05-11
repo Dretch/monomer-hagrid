@@ -38,7 +38,7 @@ import Data.List.Index (izipWith, setAt, indexed)
 import Data.Maybe (fromJust)
 import Data.Maybe as X (fromMaybe)
 import Data.Ord (Down (Down))
-import Data.Sequence (Seq, ViewR ((:>)))
+import Data.Sequence (Seq ((:<|)), ViewR ((:>)))
 import qualified Data.Sequence as S
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -164,18 +164,16 @@ haGrid columnDefs items = widget
                 chH = S.index rowYs (row + 1) - S.index rowYs row - _cdPaddingH * 2
 
         contentRenderAfter wenv node renderer = do
-          setStrokeColor renderer (accentColor wenv)
-          setStrokeWidth renderer 1
+
+          forM_ (adjacentPairs (S.drop 1 rowYs)) $ \(y1, y2) -> do
+            drawRect renderer (Rect l (t + y1) lastColX (y2 - y1)) (Just oddRowBgColor) Nothing
 
           forM_ (S.drop 1 colXs) $ \colX -> do
-            beginPath renderer
-            renderLine renderer (Point (l + colX) t) (Point (l + colX) (t + lastRowY))
-            stroke renderer
+            drawLine renderer (Point (l + colX) t) (Point (l + colX) (t + lastRowY)) 1 (Just lineColor)
           
           forM_ (S.drop 1 rowYs) $ \rowY -> do
-            beginPath renderer
-            renderLine renderer (Point l (t + rowY)) (Point (l + lastColX) (t + rowY))
-            stroke renderer
+            drawLine renderer (Point l (t + rowY)) (Point (l + lastColX) (t + rowY)) 1 (Just lineColor)
+          
           where
             colXs = sizesToPositions (S.fromList (fromIntegral <$> _mColumnWidths))
             rowYs = sizesToPositions (toRowHeights (node ^. L.children) columnDefsSeq)
@@ -186,6 +184,8 @@ haGrid columnDefs items = widget
               | _ :> a <- S.viewr rowYs = a
               | otherwise = 0
             Rect l t _w _h = node ^. L.info . L.viewport
+            oddRowBgColor = (accentColor wenv) { _colorA = 0.1 }
+            lineColor = accentColor wenv
 
         headerPaneContainer =
           createContainer
@@ -465,3 +465,8 @@ toRowHeights children columnDefs = mergeHeights <$> S.chunksOf (length columnDef
         & _wniSizeReqH
         & _szrFixed
         & (+ (_cdPaddingH * 2))
+
+adjacentPairs :: Seq a -> Seq (a, a)
+adjacentPairs = \case
+  a :<| b :<| rest -> (a, b) :<| adjacentPairs rest
+  _ -> S.empty
