@@ -22,7 +22,7 @@ module HaGrid
     columnSortKey,
     columnPadding,
     columnPaddingW,
-    columnPaddingH
+    columnPaddingH,
   )
 where
 
@@ -34,7 +34,7 @@ import Data.Default.Class as X (def)
 import Data.Foldable (foldl')
 import qualified Data.List as List
 import Data.List.Extra as X ((!?))
-import Data.List.Index (izipWith, setAt, indexed)
+import Data.List.Index (indexed, izipWith, setAt)
 import Data.Maybe (fromJust)
 import Data.Maybe as X (fromMaybe)
 import Data.Ord (Down (Down))
@@ -127,7 +127,7 @@ haGrid columnDefs items = widget
         columnDefsSeq = S.fromList columnDefs
 
         dragHandleWidth = 4
-        dragHandleHeight = 32
+        dragHandleHeight = 40
 
         contentPaneContainer =
           createContainer
@@ -156,7 +156,7 @@ haGrid columnDefs items = widget
               (col, columnDef) <- indexed columnDefs
               pure (assignArea col columnDef row)
 
-            assignArea col ColumnDef{_cdPaddingW, _cdPaddingH} row = Rect chX chY chW chH
+            assignArea col ColumnDef {_cdPaddingW, _cdPaddingH} row = Rect chX chY chW chH
               where
                 chX = l + S.index colXs col + _cdPaddingW
                 chY = t + S.index rowYs row + _cdPaddingH
@@ -164,16 +164,14 @@ haGrid columnDefs items = widget
                 chH = S.index rowYs (row + 1) - S.index rowYs row - _cdPaddingH * 2
 
         contentRenderAfter wenv node renderer = do
-
           forM_ (adjacentPairs (S.drop 1 rowYs)) $ \(y1, y2) -> do
             drawRect renderer (Rect l (t + y1) lastColX (y2 - y1)) (Just oddRowBgColor) Nothing
 
           forM_ (S.drop 1 colXs) $ \colX -> do
             drawLine renderer (Point (l + colX) t) (Point (l + colX) (t + lastRowY)) 1 (Just lineColor)
-          
+
           forM_ (S.drop 1 rowYs) $ \rowY -> do
             drawLine renderer (Point l (t + rowY)) (Point (l + lastColX) (t + rowY)) 1 (Just lineColor)
-          
           where
             colXs = sizesToPositions (S.fromList (fromIntegral <$> _mColumnWidths))
             rowYs = sizesToPositions (toRowHeights (node ^. L.children) columnDefsSeq)
@@ -184,7 +182,7 @@ haGrid columnDefs items = widget
               | _ :> a <- S.viewr rowYs = a
               | otherwise = 0
             Rect l t _w _h = node ^. L.info . L.viewport
-            oddRowBgColor = (accentColor wenv) { _colorA = 0.1 }
+            oddRowBgColor = (accentColor wenv) {_colorA = 0.1}
             lineColor = accentColor wenv
 
         headerPaneContainer =
@@ -327,10 +325,10 @@ columnPadding :: ColumnDef e a -> Double -> ColumnDef e a
 columnPadding c p = columnPaddingH (columnPaddingW c p) p
 
 columnPaddingW :: ColumnDef e a -> Double -> ColumnDef e a
-columnPaddingW c p = c { _cdPaddingW = p }
+columnPaddingW c p = c {_cdPaddingW = p}
 
 columnPaddingH :: ColumnDef e a -> Double -> ColumnDef e a
-columnPaddingH c p = c { _cdPaddingH = p }
+columnPaddingH c p = c {_cdPaddingH = p}
 
 defaultColumnInitialWidth :: Int
 defaultColumnInitialWidth = 100
@@ -373,15 +371,11 @@ headerDragHandle colIndex ColumnDef {_cdName, _cdSortKey, _cdMinWidth} columnWid
           createSingle
             state
             def
-              { singleGetSizeReq = getSizeReq,
-                singleGetBaseStyle = getBaseStyle,
+              { singleGetBaseStyle = getBaseStyle,
                 singleMerge = merge,
                 singleHandleEvent = handleEvent,
                 singleRender = render
               }
-
-        getSizeReq _wenv _node =
-          (fixedSize 6, SizeReq 24 0 1 1)
 
         getBaseStyle _wenv _node =
           Just def {_styleBasic = Just def {_sstCursorIcon = Just CursorSizeH}}
@@ -459,7 +453,7 @@ toRowHeights children columnDefs = mergeHeights <$> S.chunksOf (length columnDef
     mergeHeights rowWidgets =
       foldl' max 0 (S.zipWith widgetHeight columnDefs rowWidgets)
 
-    widgetHeight ColumnDef{_cdPaddingH} widget =
+    widgetHeight ColumnDef {_cdPaddingH} widget =
       widget
         & _wnInfo
         & _wniSizeReqH

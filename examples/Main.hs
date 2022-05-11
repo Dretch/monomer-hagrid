@@ -9,7 +9,7 @@ module Main (main) where
 
 import Data.Text (Text)
 import qualified Data.Text as T
-import HaGrid (columnInitialWidth, customColumn, haGrid, showOrdColumn, textColumn, columnPadding)
+import HaGrid (columnInitialWidth, columnPadding, customColumn, haGrid, showOrdColumn, textColumn)
 import Monomer
 import Text.Printf (printf)
 
