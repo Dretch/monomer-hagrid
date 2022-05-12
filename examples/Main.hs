@@ -9,7 +9,7 @@ module Main (main) where
 
 import Data.Text (Text)
 import qualified Data.Text as T
-import HaGrid (columnInitialWidth, columnPadding, customColumn, haGrid, showOrdColumn, textColumn)
+import HaGrid (ColumnSortKey (SortWith), columnInitialWidth, columnPadding, columnSortKey, haGrid, showOrdColumn, textColumn, widgetColumn)
 import Monomer
 import Text.Printf (printf)
 
@@ -22,10 +22,11 @@ newtype AppEvent
   = FeedSpider Text
 
 data Spider = Spider
-  { _sSpecies :: Text,
+  { _sIndex :: Integer,
+    _sSpecies :: Text,
     _sName :: Text,
     _sDateOfBirth :: Text,
-    _sWeightKilos :: Integer
+    _sWeightKilos :: Double
   }
   deriving (Eq, Show)
 
@@ -43,10 +44,11 @@ main = startApp model handleEvent buildUI config
     spiders = spider <$> [1 .. 30]
     spider i =
       Spider
-        { _sSpecies = "Acromantula",
+        { _sIndex = i,
+          _sSpecies = "Acromantula",
           _sName = T.pack (printf "Son of Aragog %d" i),
           _sDateOfBirth = T.pack (printf "1942-04-%2d" i),
-          _sWeightKilos = i * 2
+          _sWeightKilos = fromIntegral i * 2.3
         }
 
 buildUI :: UIBuilder AppModel AppEvent
@@ -54,15 +56,17 @@ buildUI _wenv model = grid
   where
     grid =
       haGrid
-        [ textColumn "Name" _sName
+        [ showOrdColumn "Index" _sIndex,
+          textColumn "Name" _sName
             `columnInitialWidth` 300,
           textColumn "Species" _sSpecies
             `columnInitialWidth` 200,
           textColumn "Date of Birth" _sDateOfBirth
             `columnInitialWidth` 200,
-          showOrdColumn "Weight (Kg)" _sWeightKilos
+          textColumn "Weight (Kg)" (T.pack . printf "%.2f" . _sWeightKilos)
+            `columnSortKey` SortWith _sWeightKilos
             `columnInitialWidth` 200,
-          customColumn "Actions" actionsColumn
+          widgetColumn "Actions" actionsColumn
             `columnInitialWidth` 100
             `columnPadding` 5
         ]

@@ -16,7 +16,7 @@ module HaGrid
     haGrid,
     textColumn,
     showOrdColumn,
-    customColumn,
+    widgetColumn,
     columnInitialWidth,
     columnMinWidth,
     columnSortKey,
@@ -300,8 +300,8 @@ showOrdColumn _cdName get =
       _cdPaddingH = defaultColumnPadding
     }
 
-customColumn :: (Typeable a, Eq a, WidgetEvent e) => Text -> (forall s. a -> WidgetNode s e) -> ColumnDef e a
-customColumn _cdName get =
+widgetColumn :: (Typeable a, Eq a, WidgetEvent e) => Text -> (forall s. a -> WidgetNode s e) -> ColumnDef e a
+widgetColumn _cdName get =
   ColumnDef
     { _cdName,
       _cdWidget = customColumnWidget get,
