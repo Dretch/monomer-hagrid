@@ -8,10 +8,10 @@ module Main (main) where
 
 import Data.Text (Text)
 import qualified Data.Text as T
+import Data.Time (Day, addDays, defaultTimeLocale, formatTime, fromGregorian)
 import HaGrid (ColumnSortKey (SortWith), columnInitialWidth, columnPadding, columnSortKey, haGrid, showOrdColumn, textColumn, widgetColumn)
 import Monomer
 import Text.Printf (printf)
-import Data.Time (Day, fromGregorian, formatTime, defaultTimeLocale, addDays)
 
 newtype AppModel = AppModel
   { _appSpiders :: [Spider]

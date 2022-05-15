@@ -29,7 +29,7 @@ where
 import Control.Lens (abbreviatedFields, makeLensesWith, (%~), (.~), (<>~), (?~), (^.))
 import Control.Lens.Combinators (non)
 import Control.Lens.Lens ((&))
-import Control.Monad as X (forM_, void)
+import Control.Monad as X (forM_)
 import Data.Default.Class as X (def)
 import Data.Foldable (foldl')
 import qualified Data.List as List
@@ -165,9 +165,9 @@ haGrid columnDefs items = widget
         contentRender wenv node renderer = do
           forM_ (neighbours rowYs) $ \(y1, y2, even) -> do
             let color
-                 | mouseover && _pY mouse >= (t + y1) && _pY mouse < (t + y2) = Just mouseOverColor
-                 | not even = Just oddRowBgColor
-                 | otherwise = Nothing
+                  | mouseover && _pY mouse >= (t + y1) && _pY mouse < (t + y2) = Just mouseOverColor
+                  | not even = Just oddRowBgColor
+                  | otherwise = Nothing
             drawRect renderer (Rect l (t + y1) lastColX (y2 - y1)) color Nothing
 
           forM_ (S.drop 1 colXs) $ \colX -> do
@@ -194,7 +194,7 @@ haGrid columnDefs items = widget
 
         contentHandleEvent _wenv node _path = \case
           Move (Point _pX _pY) ->
-             -- refresh which row shows as hovered
+            -- refresh which row shows as hovered
             Just (resultReqs node [RenderOnce])
           _ -> Nothing
 
@@ -261,21 +261,12 @@ haGrid columnDefs items = widget
         headerPaneId = fromJust (widgetIdFromKey wenv (WidgetKey headerPaneKey))
         contentPaneId = fromJust (widgetIdFromKey wenv (WidgetKey contentPaneKey))
 
--- todo: use triangle fn from latest monomer
 drawSortIndicator :: Renderer -> Rect -> Maybe Color -> Bool -> IO ()
-drawSortIndicator _renderer _rect Nothing _reverse = pure ()
-drawSortIndicator renderer rect (Just color) reverse = do
-  beginPath renderer
-  setFillColor renderer color
-  moveTo renderer a
-  void (renderLineTo renderer b)
-  void (renderLineTo renderer c)
-  void (renderLineTo renderer a)
-  fill renderer
+drawSortIndicator renderer rect color reverse = drawCmd
   where
-    (a, b, c)
-      | reverse = (p1, p2, p4)
-      | otherwise = (p2, p4, p3)
+    drawCmd
+      | reverse = drawTriangle renderer p1 p2 p4 color
+      | otherwise = drawTriangle renderer p2 p4 p3 color
     Rect x y w h = rect
     p1 = Point x y
     p2 = Point (x + w) y

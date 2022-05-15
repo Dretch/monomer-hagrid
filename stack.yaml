@@ -17,7 +17,7 @@
 #
 # resolver: ./custom-snapshot.yaml
 # resolver: https://example.com/snapshots/2018-01-01.yaml
-resolver: lts-18.27
+resolver: lts-18.28
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -43,7 +43,7 @@ extra-deps:
 - extra-1.7.10
 - nanovg-0.8.0.0
 - git: "https://github.com/fjvallarino/monomer"
-  commit: "f693af605997227f692c1d796dfba3ade7d5ad4f"
+  commit: "55ae7f88f1da80064fa3dc6ce6cfb4fce47e8e5a"
 
 # Override default flag values for local packages and extra-deps
 flags:
