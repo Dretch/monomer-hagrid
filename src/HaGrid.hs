@@ -38,7 +38,7 @@ import Data.List.Index (indexed, izipWith, setAt)
 import Data.Maybe (fromJust)
 import Data.Maybe as X (fromMaybe)
 import Data.Ord (Down (Down))
-import Data.Sequence (Seq ((:<|)), ViewR ((:>)))
+import Data.Sequence (Seq ((:<|), (:|>)))
 import qualified Data.Sequence as S
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -53,17 +53,15 @@ data HaGridEvent ep
   | ResizeColumn Int Int
   | ParentEvent ep
 
-data ColumnDef e a where
-  ColumnDef ::
-    { _cdName :: Text,
-      _cdWidget :: a -> WidgetNode (HaGridModel a) (HaGridEvent e),
-      _cdSortKey :: ColumnSortKey a,
-      _cdInitialWidth :: Int,
-      _cdMinWidth :: Int,
-      _cdPaddingW :: Double,
-      _cdPaddingH :: Double
-    } ->
-    ColumnDef e a
+data ColumnDef e a = ColumnDef
+  { _cdName :: Text,
+    _cdWidget :: a -> WidgetNode (HaGridModel a) (HaGridEvent e),
+    _cdSortKey :: ColumnSortKey a,
+    _cdInitialWidth :: Int,
+    _cdMinWidth :: Int,
+    _cdPaddingW :: Double,
+    _cdPaddingH :: Double
+  }
 
 data ColumnSortKey a where
   DontSort :: ColumnSortKey a
@@ -135,7 +133,8 @@ haGrid columnDefs items = widget
             def
               { containerGetSizeReq = contentGetSizeReq,
                 containerResize = contentResize,
-                containerRenderAfter = contentRenderAfter
+                containerRender = contentRender,
+                containerHandleEvent = contentHandleEvent
               }
 
         contentGetSizeReq _wenv _node children = (w, h)
@@ -163,9 +162,13 @@ haGrid columnDefs items = widget
                 chW = S.index colXs (col + 1) - S.index colXs col - _cdPaddingW * 2
                 chH = S.index rowYs (row + 1) - S.index rowYs row - _cdPaddingH * 2
 
-        contentRenderAfter wenv node renderer = do
-          forM_ (adjacentPairs (S.drop 1 rowYs)) $ \(y1, y2) -> do
-            drawRect renderer (Rect l (t + y1) lastColX (y2 - y1)) (Just oddRowBgColor) Nothing
+        contentRender wenv node renderer = do
+          forM_ (neighbours rowYs) $ \(y1, y2, even) -> do
+            let color
+                 | mouseover && _pY mouse >= (t + y1) && _pY mouse < (t + y2) = Just mouseOverColor
+                 | not even = Just oddRowBgColor
+                 | otherwise = Nothing
+            drawRect renderer (Rect l (t + y1) lastColX (y2 - y1)) color Nothing
 
           forM_ (S.drop 1 colXs) $ \colX -> do
             drawLine renderer (Point (l + colX) t) (Point (l + colX) (t + lastRowY)) 1 (Just lineColor)
@@ -176,14 +179,24 @@ haGrid columnDefs items = widget
             colXs = sizesToPositions (S.fromList (fromIntegral <$> _mColumnWidths))
             rowYs = sizesToPositions (toRowHeights (node ^. L.children) columnDefsSeq)
             lastColX
-              | _ :> a <- S.viewr colXs = a
+              | _ :|> a <- colXs = a
               | otherwise = 0
             lastRowY
-              | _ :> a <- S.viewr rowYs = a
+              | _ :|> a <- rowYs = a
               | otherwise = 0
-            Rect l t _w _h = node ^. L.info . L.viewport
+            vp = node ^. L.info . L.viewport
+            Rect l t _w _h = vp
+            mouseover = pointInRect mouse vp
+            mouse = wenv ^. L.inputStatus . L.mousePos
+            mouseOverColor = (accentColor wenv) {_colorA = 0.3}
             oddRowBgColor = (accentColor wenv) {_colorA = 0.1}
             lineColor = accentColor wenv
+
+        contentHandleEvent _wenv node _path = \case
+          Move (Point _pX _pY) ->
+             -- refresh which row shows as hovered
+            Just (resultReqs node [RenderOnce])
+          _ -> Nothing
 
         headerPaneContainer =
           createContainer
@@ -460,7 +473,8 @@ toRowHeights children columnDefs = mergeHeights <$> S.chunksOf (length columnDef
         & _szrFixed
         & (+ (_cdPaddingH * 2))
 
-adjacentPairs :: Seq a -> Seq (a, a)
-adjacentPairs = \case
-  a :<| b :<| rest -> (a, b) :<| adjacentPairs rest
+neighbours :: Seq a -> Seq (a, a, Bool)
+neighbours = \case
+  a :<| b :<| c :<| rest -> (a, b, False) :<| (b, c, True) :<| neighbours (c :<| rest)
+  a :<| b :<| S.Empty -> S.singleton (a, b, False)
   _ -> S.empty

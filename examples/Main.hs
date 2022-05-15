@@ -12,6 +12,7 @@ import qualified Data.Text as T
 import HaGrid (ColumnSortKey (SortWith), columnInitialWidth, columnPadding, columnSortKey, haGrid, showOrdColumn, textColumn, widgetColumn)
 import Monomer
 import Text.Printf (printf)
+import Data.Time (Day, fromGregorian, formatTime, defaultTimeLocale, addDays)
 
 newtype AppModel = AppModel
   { _appSpiders :: [Spider]
@@ -25,7 +26,7 @@ data Spider = Spider
   { _sIndex :: Integer,
     _sSpecies :: Text,
     _sName :: Text,
-    _sDateOfBirth :: Text,
+    _sDateOfBirth :: Day,
     _sWeightKilos :: Double
   }
   deriving (Eq, Show)
@@ -41,15 +42,16 @@ main = startApp model handleEvent buildUI config
       ]
     model =
       AppModel {_appSpiders = spiders}
-    spiders = spider <$> [1 .. 30]
+    spiders = spider <$> [1 .. numSpiders]
     spider i =
       Spider
         { _sIndex = i,
           _sSpecies = "Acromantula",
           _sName = T.pack (printf "Son of Aragog %d" i),
-          _sDateOfBirth = T.pack (printf "1942-04-%2d" i),
-          _sWeightKilos = fromIntegral i * 2.3
+          _sDateOfBirth = addDays i (fromGregorian 1942 3 0),
+          _sWeightKilos = fromIntegral (numSpiders + 1 - i) * 2.3
         }
+    numSpiders = 1000
 
 buildUI :: UIBuilder AppModel AppEvent
 buildUI _wenv model = grid
@@ -61,7 +63,7 @@ buildUI _wenv model = grid
             `columnInitialWidth` 300,
           textColumn "Species" _sSpecies
             `columnInitialWidth` 200,
-          textColumn "Date of Birth" _sDateOfBirth
+          textColumn "Date of Birth" (T.pack . formatTime defaultTimeLocale "%Y-%m-%d" . _sDateOfBirth)
             `columnInitialWidth` 200,
           textColumn "Weight (Kg)" (T.pack . printf "%.2f" . _sWeightKilos)
             `columnSortKey` SortWith _sWeightKilos

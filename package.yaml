@@ -27,3 +27,4 @@ executables:
       - OverloadedStrings
     dependencies:
       - hagrid
+      - time
