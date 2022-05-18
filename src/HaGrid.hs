@@ -95,7 +95,7 @@ haGrid columnDefs items = widget
         []
 
     buildUI :: UIBuilder (HaGridModel a) (HaGridEvent e)
-    buildUI _wenv HaGridModel {..} = tree
+    buildUI _wenv model@HaGridModel {..} = tree
       where
         tree =
           hscroll $
@@ -110,7 +110,6 @@ haGrid columnDefs items = widget
 
         contentPane =
           defaultWidgetNode "HaGrid.ContentPane" contentPaneContainer
-            & L.children .~ S.fromList (mconcat childWidgetRows)
 
         headerWidgets =
           mconcat (izipWith headerWidgetPair columnDefs _mColumnWidths)
@@ -129,14 +128,28 @@ haGrid columnDefs items = widget
 
         contentPaneContainer =
           createContainer
-            _mColumnWidths
+            model
             def
-              { containerGetSizeReq = contentGetSizeReq,
+              { containerInit = contentInitHandler,
+                containerMerge = contentMerge,
+                containerGetSizeReq = contentGetSizeReq,
                 containerResize = contentResize,
                 containerRender = contentRender,
                 containerHandleEvent = contentHandleEvent
               }
-
+        
+        contentInitHandler _wenv node = resultNode newNode where
+          newNode = node
+            & L.children .~ S.fromList (mconcat childWidgetRows)
+          
+        contentMerge _wenv node oldNode HaGridModel{_mSortedItems = oldSortedItems} = resultNode newNode where
+          newNode = node & L.children .~ nodeChildren
+          -- re-use the old children if possible, since creating all
+          -- those labels does lots of expensive font-layout stuff
+          nodeChildren
+            | _mSortedItems == oldSortedItems = oldNode ^. L.children
+            | otherwise = S.fromList (mconcat childWidgetRows)
+        
         contentGetSizeReq _wenv _node children = (w, h)
           where
             w = fixedSize (fromIntegral (sum _mColumnWidths))

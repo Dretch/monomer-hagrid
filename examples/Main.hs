@@ -50,7 +50,7 @@ main = startApp model handleEvent buildUI config
           _sDateOfBirth = addDays i (fromGregorian 1942 3 0),
           _sWeightKilos = fromIntegral (numSpiders + 1 - i) * 2.3
         }
-    numSpiders = 1000
+    numSpiders = 100
 
 buildUI :: UIBuilder AppModel AppEvent
 buildUI _wenv model = grid
