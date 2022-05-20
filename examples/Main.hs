@@ -9,7 +9,7 @@ module Main (main) where
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time (Day, addDays, defaultTimeLocale, formatTime, fromGregorian)
-import HaGrid (ColumnSortKey (SortWith), columnInitialWidth, columnPadding, columnSortKey, haGrid, showOrdColumn, textColumn, widgetColumn)
+import HaGrid (ColumnSortKey (SortWith), SortDirection, columnInitialWidth, columnPadding, columnResizeHandler, columnSortHandler, columnSortKey, haGrid, showOrdColumn, textColumn, widgetColumn)
 import Monomer
 import Text.Printf (printf)
 
@@ -18,8 +18,10 @@ newtype AppModel = AppModel
   }
   deriving (Eq, Show)
 
-newtype AppEvent
+data AppEvent
   = FeedSpider Text
+  | NameColumnResized Int
+  | NameColumnSorted SortDirection
 
 data Spider = Spider
   { _sIndex :: Integer,
@@ -59,7 +61,9 @@ buildUI _wenv model = grid
       haGrid
         [ showOrdColumn "Index" _sIndex,
           textColumn "Name" _sName
-            `columnInitialWidth` 300,
+            `columnInitialWidth` 300
+            `columnResizeHandler` NameColumnResized
+            `columnSortHandler` NameColumnSorted,
           textColumn "Species" _sSpecies
             `columnInitialWidth` 200,
           textColumn "Date of Birth" (T.pack . formatTime defaultTimeLocale "%Y-%m-%d" . _sDateOfBirth)
@@ -79,3 +83,7 @@ handleEvent :: EventHandler AppModel AppEvent sp ep
 handleEvent _wenv _node _model = \case
   FeedSpider name ->
     [Producer (const (putStrLn ("Feeding spider " <> T.unpack name)))]
+  NameColumnResized colWidth ->
+    [Producer (const (putStrLn ("Name column was resized: " <> show colWidth)))]
+  NameColumnSorted direction ->
+    [Producer (const (putStrLn ("Name column was sorted: " <> show direction)))]

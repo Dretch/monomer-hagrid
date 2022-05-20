@@ -13,6 +13,7 @@
 module HaGrid
   ( ColumnDef,
     ColumnSortKey (..),
+    SortDirection (..),
     haGrid,
     textColumn,
     showOrdColumn,
@@ -23,6 +24,8 @@ module HaGrid
     columnPadding,
     columnPaddingW,
     columnPaddingH,
+    columnResizeHandler,
+    columnSortHandler,
   )
 where
 
@@ -33,9 +36,8 @@ import Control.Monad as X (forM_)
 import Data.Default.Class as X (def)
 import Data.Foldable (foldl')
 import qualified Data.List as List
-import Data.List.Extra as X ((!?))
 import Data.List.Index (indexed, izipWith, setAt)
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, maybeToList)
 import Data.Maybe as X (fromMaybe)
 import Data.Ord (Down (Down))
 import Data.Sequence (Seq ((:<|), (:|>)))
@@ -51,6 +53,7 @@ import Monomer.Widgets.Single
 data HaGridEvent ep
   = OrderByColumn Int
   | ResizeColumn Int Int
+  | ResizeColumnFinished Int
   | ParentEvent ep
 
 data ColumnDef e a = ColumnDef
@@ -60,18 +63,25 @@ data ColumnDef e a = ColumnDef
     _cdInitialWidth :: Int,
     _cdMinWidth :: Int,
     _cdPaddingW :: Double,
-    _cdPaddingH :: Double
+    _cdPaddingH :: Double,
+    _cdResizeHandler :: Maybe (Int -> e),
+    _cdSortHandler :: Maybe (SortDirection -> e)
   }
 
 data ColumnSortKey a where
   DontSort :: ColumnSortKey a
   SortWith :: Ord b => (a -> b) -> ColumnSortKey a
 
+data SortDirection
+  = SortAscending
+  | SortDescending
+  deriving (Eq, Show)
+
 data HaGridModel a = HaGridModel
   { _mSortedItems :: [a],
     _mColumnWidths :: [Int],
     _mSortColumn :: Maybe Int,
-    _mSortReverse :: Bool
+    _mSortDirection :: SortDirection
   }
   deriving (Eq, Show)
 
@@ -83,7 +93,7 @@ data HeaderDragHandleState = HeaderDragHandleState
   }
   deriving (Eq, Show)
 
-haGrid :: forall a s e. (Typeable a, Eq a, WidgetModel s, WidgetEvent e) => [ColumnDef e a] -> [a] -> WidgetNode s e
+haGrid :: forall a s e. (CompositeModel a, WidgetModel s, WidgetEvent e) => [ColumnDef e a] -> [a] -> WidgetNode s e
 haGrid columnDefs items = widget
   where
     widget =
@@ -91,7 +101,7 @@ haGrid columnDefs items = widget
         "HaGrid.Root"
         (WidgetValue (initialModel columnDefs items))
         buildUI
-        (handleEvent columnDefs)
+        handleEvent
         []
 
     buildUI :: UIBuilder (HaGridModel a) (HaGridEvent e)
@@ -104,33 +114,44 @@ haGrid columnDefs items = widget
                 vscroll (contentPane columnDefs model `nodeKey` contentPaneKey)
               ]
 
-    handleEvent :: [ColumnDef ep a] -> EventHandler (HaGridModel a) (HaGridEvent ep) sp ep
-    handleEvent columnDefs wenv _node model = \case
-      OrderByColumn colIndex
-        | Just ColumnDef {_cdSortKey = DontSort} <- columnDefs !? colIndex ->
-            []
-        | Just c <- (model ^. sortColumn),
-          c == colIndex ->
-            [Model (sortItems columnDefs (model & sortReverse %~ not))]
-        | otherwise ->
-            [Model (sortItems columnDefs (model & sortColumn ?~ colIndex & sortReverse .~ False))]
+    handleEvent :: EventHandler (HaGridModel a) (HaGridEvent e) sp e
+    handleEvent wenv _node model = \case
+      OrderByColumn colIndex -> result
+        where
+          ColumnDef {_cdSortKey, _cdSortHandler} = columnDefs !! colIndex
+          newModel
+            | Just c <- (model ^. sortColumn),
+              c == colIndex =
+                model & sortDirection %~ flipSortDirection
+            | otherwise =
+                model & sortColumn ?~ colIndex & sortDirection .~ SortAscending
+          result =
+            Model (sortItems columnDefs newModel) : handler
+          handler =
+            Report <$> maybeToList (_cdSortHandler <*> Just (newModel ^. sortDirection))
       ResizeColumn colIndex width ->
         [ Model (model & columnWidths %~ setAt colIndex width),
           Request (ResizeWidgets headerPaneId),
           Request (ResizeWidgets contentPaneId)
         ]
+      ResizeColumnFinished colIndex -> result
+        where
+          width = (model ^. columnWidths) !! colIndex
+          ColumnDef {_cdResizeHandler} = columnDefs !! colIndex
+          result =
+            Report <$> maybeToList (_cdResizeHandler <*> Just width)
       ParentEvent e ->
         [Report e]
       where
         headerPaneId = fromJust (widgetIdFromKey wenv (WidgetKey headerPaneKey))
         contentPaneId = fromJust (widgetIdFromKey wenv (WidgetKey contentPaneKey))
 
-drawSortIndicator :: Renderer -> Rect -> Maybe Color -> Bool -> IO ()
-drawSortIndicator renderer rect color reverse = drawCmd
+drawSortIndicator :: Renderer -> Rect -> Maybe Color -> SortDirection -> IO ()
+drawSortIndicator renderer rect color dir = drawCmd
   where
-    drawCmd
-      | reverse = drawTriangle renderer p1 p2 p4 color
-      | otherwise = drawTriangle renderer p2 p4 p3 color
+    drawCmd = case dir of
+      SortAscending -> drawTriangle renderer p2 p4 p3 color
+      SortDescending -> drawTriangle renderer p1 p2 p4 color
     Rect x y w h = rect
     p1 = Point x y
     p2 = Point (x + w) y
@@ -190,7 +211,7 @@ headerPane columnDefs HaGridModel {..} = node
       forM_ _mSortColumn (renderSortIndicator wenv node renderer)
 
     renderSortIndicator wenv node renderer sortCol = do
-      drawSortIndicator renderer indRect (Just (accentColor wenv)) _mSortReverse
+      drawSortIndicator renderer indRect (Just (accentColor wenv)) _mSortDirection
       where
         style = wenv ^. L.theme . L.basic . L.btnStyle
         Rect l t _w h = node ^. L.info . L.viewport
@@ -198,9 +219,9 @@ headerPane columnDefs HaGridModel {..} = node
         colOffset = fromIntegral (sum (take (sortCol + 1) _mColumnWidths) - dragHandleWidth)
         indW = unFontSize size * 2 / 3
         pad = indW / 3
-        indT
-          | _mSortReverse = t + pad
-          | otherwise = h - pad - indW
+        indT = case _mSortDirection of
+          SortAscending -> h - pad - indW
+          SortDescending -> t + pad
         indL = l + colOffset - indW - pad
         indRect = Rect indL indT indW indW
 
@@ -237,12 +258,12 @@ headerDragHandle colIndex ColumnDef {_cdName, _cdSortKey, _cdMinWidth} columnWid
           ButtonAction (Point _pX _pY) _btn BtnPressed _clicks -> Just result
             where
               -- todo: only if not focussed? set focus?
-              result = resultReqs newNode [] -- todo: render? (to show now dragging?)
+              result = resultNode newNode
               newNode = node & L.widget .~ headerDragHandleWidget newState
               newState = Just (HeaderDragHandleState _pX columnWidth)
           ButtonAction _point _btn BtnReleased _clicks -> Just result
             where
-              result = resultReqs newNode [] -- todo: render? (to show no-longer dragging?)
+              result = resultReqs newNode [RaiseEvent (ResizeColumnFinished colIndex)]
               newNode = node & L.widget .~ headerDragHandleWidget Nothing
           Move (Point _pX _pY) -> Just result
             where
@@ -374,7 +395,7 @@ initialModel columnDefs items =
       { _mSortedItems = items,
         _mColumnWidths = _cdInitialWidth <$> columnDefs,
         _mSortColumn = Nothing,
-        _mSortReverse = False
+        _mSortDirection = SortAscending
       }
 
 headerPaneKey :: Text
@@ -384,14 +405,14 @@ contentPaneKey :: Text
 contentPaneKey = "HaGrid.contentPane"
 
 sortItems :: [ColumnDef ep a] -> HaGridModel a -> HaGridModel a
-sortItems columnDefs model
-  | Just sc <- model ^. sortColumn,
-    Just ColumnDef {_cdSortKey = SortWith f} <- columnDefs !? sc =
-      if model ^. sortReverse
-        then model & sortedItems %~ List.sortOn (Down . f)
-        else model & sortedItems %~ List.sortOn f
-  | otherwise =
-      model
+sortItems columnDefs model = case model ^. sortColumn of
+  Just sc
+    | ColumnDef {_cdSortKey = SortWith f} <- columnDefs !! sc ->
+        case model ^. sortDirection of
+          SortAscending -> model & sortedItems %~ List.sortOn f
+          SortDescending -> model & sortedItems %~ List.sortOn (Down . f)
+  _ ->
+    model
 
 sizesToPositions :: Seq Double -> Seq Double
 sizesToPositions = S.scanl (+) 0
@@ -424,7 +445,9 @@ textColumn _cdName get =
       _cdSortKey = SortWith get,
       _cdMinWidth = defaultColumnMinWidth,
       _cdPaddingW = defaultColumnPadding,
-      _cdPaddingH = defaultColumnPadding
+      _cdPaddingH = defaultColumnPadding,
+      _cdResizeHandler = Nothing,
+      _cdSortHandler = Nothing
     }
 
 showOrdColumn :: (Show b, Ord b) => Text -> (a -> b) -> ColumnDef e a
@@ -436,7 +459,9 @@ showOrdColumn _cdName get =
       _cdSortKey = SortWith get,
       _cdMinWidth = defaultColumnMinWidth,
       _cdPaddingW = defaultColumnPadding,
-      _cdPaddingH = defaultColumnPadding
+      _cdPaddingH = defaultColumnPadding,
+      _cdResizeHandler = Nothing,
+      _cdSortHandler = Nothing
     }
 
 widgetColumn :: (Typeable a, Eq a, WidgetEvent e) => Text -> (forall s. a -> WidgetNode s e) -> ColumnDef e a
@@ -448,7 +473,9 @@ widgetColumn _cdName get =
       _cdSortKey = DontSort,
       _cdMinWidth = defaultColumnMinWidth,
       _cdPaddingW = defaultColumnPadding,
-      _cdPaddingH = defaultColumnPadding
+      _cdPaddingH = defaultColumnPadding,
+      _cdResizeHandler = Nothing,
+      _cdSortHandler = Nothing
     }
 
 columnInitialWidth :: ColumnDef e a -> Int -> ColumnDef e a
@@ -468,6 +495,12 @@ columnPaddingW c p = c {_cdPaddingW = p}
 
 columnPaddingH :: ColumnDef e a -> Double -> ColumnDef e a
 columnPaddingH c p = c {_cdPaddingH = p}
+
+columnResizeHandler :: ColumnDef e a -> (Int -> e) -> ColumnDef e a
+columnResizeHandler c f = c {_cdResizeHandler = Just f}
+
+columnSortHandler :: ColumnDef e a -> (SortDirection -> e) -> ColumnDef e a
+columnSortHandler c f = c {_cdSortHandler = Just f}
 
 defaultColumnInitialWidth :: Int
 defaultColumnInitialWidth = 100
@@ -493,3 +526,7 @@ customColumnWidget get item =
     handleEvent :: forall s. EventHandler s ep (HaGridModel a) (HaGridEvent ep)
     handleEvent _wenv _node _model e =
       [Report (ParentEvent e)]
+
+flipSortDirection :: SortDirection -> SortDirection
+flipSortDirection SortAscending = SortDescending
+flipSortDirection SortDescending = SortAscending

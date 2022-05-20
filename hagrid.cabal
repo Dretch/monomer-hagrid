@@ -23,7 +23,6 @@ library
       base >=4.7 && <5
     , containers
     , data-default-class
-    , extra
     , ilist
     , lens
     , monomer
@@ -43,7 +42,6 @@ executable examples
       base >=4.7 && <5
     , containers
     , data-default-class
-    , extra
     , hagrid
     , ilist
     , lens
