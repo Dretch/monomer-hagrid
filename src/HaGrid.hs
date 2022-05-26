@@ -11,7 +11,7 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 
 module HaGrid
-  ( ColumnDef,
+  ( ColumnDef (..),
     ColumnSortKey (..),
     SortDirection (..),
     haGrid,
@@ -93,6 +93,7 @@ data HeaderDragHandleState = HeaderDragHandleState
   }
   deriving (Eq, Show)
 
+-- todo: accept lens ?
 haGrid :: forall a s e. (CompositeModel a, WidgetModel s, WidgetEvent e) => [ColumnDef e a] -> [a] -> WidgetNode s e
 haGrid columnDefs items = widget
   where
