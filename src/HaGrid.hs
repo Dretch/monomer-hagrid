@@ -438,38 +438,32 @@ neighbours = \case
   _ -> S.empty
 
 textColumn :: Text -> (a -> Text) -> ColumnDef e a
-textColumn _cdName get =
-  ColumnDef
-    { _cdName,
-      _cdWidget = \item -> label_ (get item) [ellipsis],
-      _cdInitialWidth = defaultColumnInitialWidth,
-      _cdSortKey = SortWith get,
-      _cdMinWidth = defaultColumnMinWidth,
-      _cdPaddingW = defaultColumnPadding,
-      _cdPaddingH = defaultColumnPadding,
-      _cdResizeHandler = Nothing,
-      _cdSortHandler = Nothing
-    }
+textColumn _cdName get = (defaultColumn _cdName _cdWidget) {_cdSortKey}
+  where
+    _cdWidget item = label_ (get item) [ellipsis]
+    _cdSortKey = SortWith get
 
 showOrdColumn :: (Show b, Ord b) => Text -> (a -> b) -> ColumnDef e a
-showOrdColumn _cdName get =
-  ColumnDef
-    { _cdName,
-      _cdWidget = \item -> label_ ((T.pack . show . get) item) [ellipsis],
-      _cdInitialWidth = defaultColumnInitialWidth,
-      _cdSortKey = SortWith get,
-      _cdMinWidth = defaultColumnMinWidth,
-      _cdPaddingW = defaultColumnPadding,
-      _cdPaddingH = defaultColumnPadding,
-      _cdResizeHandler = Nothing,
-      _cdSortHandler = Nothing
-    }
+showOrdColumn _cdName get = (defaultColumn _cdName _cdWidget) {_cdSortKey}
+  where
+    _cdWidget item = label_ ((T.pack . show . get) item) [ellipsis]
+    _cdSortKey = SortWith get
 
 widgetColumn :: (Typeable a, Eq a, WidgetEvent e) => Text -> (forall s. a -> WidgetNode s e) -> ColumnDef e a
-widgetColumn _cdName get =
+widgetColumn _cdName get = defaultColumn _cdName _cdWidget
+  where
+    _cdWidget item =
+      compositeD_ "HaGrid.Cell" (WidgetValue item) buildUI handleEvent []
+    buildUI _wenv model =
+      get model
+    handleEvent _wenv _node _model e =
+      [Report (ParentEvent e)]
+
+defaultColumn :: Text -> (a -> WidgetNode (HaGridModel a) (HaGridEvent e)) -> ColumnDef e a
+defaultColumn _cdName _cdWidget =
   ColumnDef
     { _cdName,
-      _cdWidget = customColumnWidget get,
+      _cdWidget,
       _cdInitialWidth = defaultColumnInitialWidth,
       _cdSortKey = DontSort,
       _cdMinWidth = defaultColumnMinWidth,
@@ -511,22 +505,6 @@ defaultColumnMinWidth = 60
 
 defaultColumnPadding :: Double
 defaultColumnPadding = 10
-
-customColumnWidget ::
-  forall ep a.
-  (WidgetModel ep, Typeable a, Eq a) =>
-  (a -> forall s. WidgetNode s ep) ->
-  a ->
-  WidgetNode (HaGridModel a) (HaGridEvent ep)
-customColumnWidget get item =
-  compositeD_ "HaGrid.Cell" (WidgetValue item) buildUI handleEvent []
-  where
-    buildUI :: forall s. UIBuilder s ep
-    buildUI _wenv _model = get item
-
-    handleEvent :: forall s. EventHandler s ep (HaGridModel a) (HaGridEvent ep)
-    handleEvent _wenv _node _model e =
-      [Report (ParentEvent e)]
 
 flipSortDirection :: SortDirection -> SortDirection
 flipSortDirection SortAscending = SortDescending

@@ -76,17 +76,17 @@ buildUI _wenv model = tree
           vstack_
             [childSpacing]
             (zipWith columnConfigurer [0 .. length (model ^. columns) - 1] gridColumns)
-          `styleBasic` [padding 8]
+            `styleBasic` [padding 8]
         ]
-    
+
     grid =
       HaGrid.haGrid
         (mconcat (zipWith column (model ^. columns) gridColumns))
         (_appSpiders model)
-    
+
     column (AppColumn enabled) columnDef =
       [columnDef | enabled]
-    
+
     columnConfigurer :: Int -> HaGrid.ColumnDef AppEvent Spider -> WidgetNode AppModel AppEvent
     columnConfigurer idx columnDef =
       labeledCheckbox_
