@@ -94,6 +94,7 @@ data HeaderDragHandleState = HeaderDragHandleState
   deriving (Eq, Show)
 
 -- todo: accept lens ?
+-- todo: fix bug where row changes reset the column widths (custom merge needed?)
 hagrid :: forall a s e. (CompositeModel a, WidgetModel s, WidgetEvent e) => [ColumnDef e a] -> [a] -> WidgetNode s e
 hagrid columnDefs items = widget
   where
@@ -289,11 +290,12 @@ headerDragHandle colIndex ColumnDef {_cdName, _cdSortKey, _cdMinWidth} columnWid
           where
             vp = node ^. L.info . L.viewport
 
-contentPane :: (Typeable a, Eq a) => [ColumnDef ep a] -> HagridModel a -> WidgetNode (HagridModel a) (HagridEvent ep)
+contentPane :: Typeable a => [ColumnDef ep a] -> HagridModel a -> WidgetNode (HagridModel a) (HagridEvent ep)
 contentPane columnDefs model@HagridModel {..} = node
   where
     node =
       defaultWidgetNode "Hagrid.ContentPane" contentPaneContainer
+        & L.children .~ S.fromList (mconcat childWidgetRows)
 
     childWidgetRows =
       [[_cdWidget item | ColumnDef {_cdWidget} <- columnDefs] | item <- _mSortedItems]
@@ -305,31 +307,11 @@ contentPane columnDefs model@HagridModel {..} = node
       createContainer
         model
         def
-          { containerInit = contentInitHandler,
-            containerMerge = contentMerge,
-            containerGetSizeReq = contentGetSizeReq,
+          { containerGetSizeReq = contentGetSizeReq,
             containerResize = contentResize,
             containerRender = contentRender,
             containerHandleEvent = contentHandleEvent
           }
-
-    contentInitHandler _wenv node = resultNode newNode
-      where
-        newNode =
-          node
-            & L.children .~ S.fromList (mconcat childWidgetRows)
-
-    contentMerge _wenv node oldNode oldModel = resultNode newNode
-      where
-        newNode = node & L.children .~ nodeChildren
-        -- re-use the old children if only column widths have changed, since
-        -- creating all those labels does lots of expensive font-layout stuff
-        nodeChildren
-          | zeroColumnWidths model == zeroColumnWidths oldModel = oldNode ^. L.children
-          | otherwise = S.fromList (mconcat childWidgetRows)
-        zeroColumnWidths :: HagridModel a -> HagridModel a
-        zeroColumnWidths model =
-          model & columnWidths %~ (map (const 0))
 
     contentGetSizeReq _wenv _node children = (w, h)
       where

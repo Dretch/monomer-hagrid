@@ -19,7 +19,8 @@ import Monomer.Hagrid (ColumnDef (..), ColumnSortKey (SortWith), SortDirection, 
 import Text.Printf (printf)
 
 data AppModel = AppModel
-  { _appSpiders :: [Spider],
+  { _appTheme :: Theme,
+    _appSpiders :: [Spider],
     _appColumns :: [AppColumn]
   }
   deriving (Eq, Show)
@@ -51,11 +52,14 @@ main = startApp model handleEvent buildUI config
     config =
       [ appWindowTitle "Hagrid Examples",
         appFontDef "Regular" "./assets/fonts/Cantarell/Cantarell-Regular.ttf",
-        appTheme darkTheme,
         appDisableAutoScale True
       ]
     model =
-      AppModel {_appSpiders = spiders, _appColumns = AppColumn True <$ gridColumns}
+      AppModel
+        { _appTheme = lightTheme,
+          _appSpiders = spiders,
+          _appColumns = AppColumn True <$ gridColumns
+        }
     spiders = spider <$> [1 .. numSpiders]
     spider i =
       Spider
@@ -71,13 +75,14 @@ buildUI :: UIBuilder AppModel AppEvent
 buildUI _wenv model = tree
   where
     tree =
-      vstack
-        [ grid,
-          vstack_
-            [childSpacing]
-            (zipWith columnConfigurer [0 .. length (model ^. columns) - 1] gridColumns)
-            `styleBasic` [padding 8]
-        ]
+      themeSwitch_ (_appTheme model) [themeClearBg] $
+        vstack
+          [ grid,
+            vstack_
+              [childSpacing]
+              (themeConfigurer : columnConfigurers)
+              `styleBasic` [padding 8]
+          ]
 
     grid =
       hagrid
@@ -86,6 +91,16 @@ buildUI _wenv model = tree
 
     column (AppColumn enabled) columnDef =
       [columnDef | enabled]
+
+    themeConfigurer =
+      hstack_
+        [childSpacing]
+        [ labeledRadio_ "Dark Theme" darkTheme theme [textRight],
+          labeledRadio_ "Light Theme" lightTheme theme [textRight]
+        ]
+
+    columnConfigurers =
+      zipWith columnConfigurer [0 .. length (model ^. columns) - 1] gridColumns
 
     columnConfigurer :: Int -> ColumnDef AppEvent Spider -> WidgetNode AppModel AppEvent
     columnConfigurer idx columnDef =
