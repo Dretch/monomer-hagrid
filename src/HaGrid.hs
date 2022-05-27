@@ -449,6 +449,7 @@ showOrdColumn _cdName get = (defaultColumn _cdName _cdWidget) {_cdSortKey}
     _cdWidget item = label_ ((T.pack . show . get) item) [ellipsis]
     _cdSortKey = SortWith get
 
+-- todo: allow widgets that use the model
 widgetColumn :: (Typeable a, Eq a, WidgetEvent e) => Text -> (forall s. a -> WidgetNode s e) -> ColumnDef e a
 widgetColumn _cdName get = defaultColumn _cdName _cdWidget
   where
