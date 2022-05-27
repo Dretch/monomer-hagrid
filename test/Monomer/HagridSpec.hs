@@ -6,7 +6,7 @@ import Monomer
 import Monomer.Hagrid
 import qualified Monomer.Lens as L
 import Monomer.TestUtil
-import Test.Hspec (Spec, describe, it, shouldBe)
+import Test.Hspec (Spec, describe, it, shouldBe, pendingWith)
 
 data TestModel = TestModel
   deriving (Eq, Show)
@@ -20,6 +20,7 @@ newtype TestItem = TestItem
 spec :: Spec
 spec = do
   resize
+  sorting
 
 resize :: Spec
 resize = describe "resize" $ do
@@ -48,6 +49,25 @@ resize = describe "resize" $ do
       [TestItem 0]
       `shouldBe` [Rect 0 40 50 47, Rect 50 40 50 47]
 
+sorting :: Spec
+sorting = describe "sorting" $ do
+  it "should not sort rows by default" $ do
+    cellViewports
+      [widgetColumn "Col 1" (testCellWidget _tiHeight) `columnPadding` 0 `columnInitialWidth` 50]
+      [TestItem 20, TestItem 10, TestItem 30]
+      `shouldBe` [Rect 0 40 50 20, Rect 0 60 50 10, Rect 0 70 50 30]
+  
+  it "should sort by ascending when column header clicked" $ do
+    pendingWith "not sure how to make this test work yet"
+    cellViewports_
+      [widgetColumn "Col 1" (testCellWidget _tiHeight) `columnPadding` 0 `columnInitialWidth` 50]
+      [TestItem 20, TestItem 10, TestItem 30]
+      [Click (Point 10 10) BtnLeft 1]
+      `shouldBe` [Rect 0 40 50 10, Rect 0 50 50 20, Rect 0 70 50 30]
+  
+  it "should sort by descending when column header clicked again" $ do
+    pendingWith "not sure how to make this test work yet"
+
 -- | We test with custom widgets because these will create special "Hagrid.Cell" nodes in the widget
 -- tree that we can later use to pick out the cell widgets.
 testCellWidget :: (TestItem -> Double) -> TestItem -> WidgetNode s TestEvent
@@ -58,11 +78,16 @@ testCellWidget getHeight item = wgt
     reqH = fixedSize (getHeight item)
 
 cellViewports :: [ColumnDef TestEvent TestItem] -> [TestItem] -> [Rect]
-cellViewports columnDefs items = Foldable.toList childVps
+cellViewports columnDefs items =
+  cellViewports_ columnDefs items []
+
+cellViewports_ :: [ColumnDef TestEvent TestItem] -> [TestItem] -> [SystemEvent] -> [Rect]
+cellViewports_ columnDefs items evts = Foldable.toList childVps
   where
     node = nodeInit wenv (hagrid columnDefs items)
-    node' = widgetGetInstanceTree (node ^. L.widget) wenv node
-    childVps = roundRectUnits . _wniViewport . _winInfo <$> widgetsOfType "Hagrid.Cell" node'
+    node' = nodeHandleEventRoot wenv evts node
+    node'' = widgetGetInstanceTree (node ^. L.widget) wenv node'
+    childVps = roundRectUnits . _wniViewport . _winInfo <$> widgetsOfType "Hagrid.Cell" node''
 
 widgetsOfType :: WidgetType -> WidgetInstanceNode -> [WidgetInstanceNode]
 widgetsOfType typ node = thisOne <> childOnes
