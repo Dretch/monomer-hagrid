@@ -9,6 +9,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
 module Monomer.Hagrid
   ( ColumnDef (..),
@@ -29,14 +30,24 @@ module Monomer.Hagrid
   )
 where
 
-import Control.Lens (abbreviatedFields, makeLensesWith, (%~), (.~), (<>~), (?~), (^.))
+import Control.Lens
+  ( abbreviatedFields,
+    ix,
+    makeLensesWith,
+    singular,
+    (%~),
+    (.~),
+    (<>~),
+    (?~),
+    (^.),
+  )
 import Control.Lens.Combinators (non)
 import Control.Lens.Lens ((&))
 import Control.Monad as X (forM_)
 import Data.Default.Class as X (def)
 import Data.Foldable (foldl')
 import qualified Data.List as List
-import Data.List.Index (indexed, izipWith, setAt)
+import Data.List.Index (indexed, izipWith, modifyAt)
 import Data.Maybe (fromJust, maybeToList)
 import Data.Maybe as X (fromMaybe)
 import Data.Ord (Down (Down))
@@ -79,13 +90,20 @@ data SortDirection
 
 data HagridModel a = HagridModel
   { _mSortedItems :: [a],
-    _mColumnWidths :: [Int],
+    _mColumns :: [ModelColumn],
     _mSortColumn :: Maybe Int,
     _mSortDirection :: SortDirection
   }
   deriving (Eq, Show)
 
+data ModelColumn = ModelColumn
+  { _mcCurrentWidth :: Int,
+    _mcName :: Text
+  }
+  deriving (Eq, Show)
+
 makeLensesWith abbreviatedFields ''HagridModel
+makeLensesWith abbreviatedFields ''ModelColumn
 
 data HeaderDragHandleState = HeaderDragHandleState
   { _hdhsDragStartMouseX :: Double,
@@ -94,7 +112,6 @@ data HeaderDragHandleState = HeaderDragHandleState
   deriving (Eq, Show)
 
 -- todo: accept lens ?
--- todo: fix bug where row changes reset the column widths (custom merge needed?)
 hagrid :: forall a s e. (CompositeModel a, WidgetModel s, WidgetEvent e) => [ColumnDef e a] -> [a] -> WidgetNode s e
 hagrid columnDefs items = widget
   where
@@ -104,7 +121,7 @@ hagrid columnDefs items = widget
         (WidgetValue (initialModel columnDefs items))
         buildUI
         handleEvent
-        []
+        [compositeMergeModel mergeModel]
 
     buildUI :: UIBuilder (HagridModel a) (HagridEvent e)
     buildUI _wenv model = tree
@@ -131,22 +148,35 @@ hagrid columnDefs items = widget
             Model (sortItems columnDefs newModel) : handler
           handler =
             Report <$> maybeToList (_cdSortHandler <*> Just (newModel ^. sortDirection))
-      ResizeColumn colIndex width ->
-        [ Model (model & columnWidths %~ setAt colIndex width),
+      ResizeColumn colIndex newWidth ->
+        [ Model (model & columns %~ modifyAt colIndex (currentWidth .~ newWidth)),
           Request (ResizeWidgets headerPaneId),
           Request (ResizeWidgets contentPaneId)
         ]
       ResizeColumnFinished colIndex -> result
         where
-          width = (model ^. columnWidths) !! colIndex
+          finalWidth = model ^. columns . singular (ix colIndex) . currentWidth
           ColumnDef {_cdResizeHandler} = columnDefs !! colIndex
           result =
-            Report <$> maybeToList (_cdResizeHandler <*> Just width)
+            Report <$> maybeToList (_cdResizeHandler <*> Just finalWidth)
       ParentEvent e ->
         [Report e]
       where
         headerPaneId = fromJust (widgetIdFromKey wenv (WidgetKey headerPaneKey))
         contentPaneId = fromJust (widgetIdFromKey wenv (WidgetKey contentPaneKey))
+
+    -- If the column names have not changed then preseve the column widths too,
+    -- otherwise item/theme/etc changes will reset the column widths
+    mergeModel :: MergeModelHandler (HagridModel a) (HagridEvent e) s
+    mergeModel _wenv _parentModel oldModel newModel = resultModel
+      where
+        resultModel
+          | columnNames oldModel == columnNames newModel =
+              newModel & columns .~ (oldModel ^. columns)
+          | otherwise =
+              newModel
+        columnNames m =
+          _mcName <$> _mColumns m
 
 drawSortIndicator :: Renderer -> Rect -> Maybe Color -> SortDirection -> IO ()
 drawSortIndicator renderer rect color dir = drawCmd
@@ -178,16 +208,16 @@ headerPane columnDefs HagridModel {..} = node
     dragHandleHeight = 40
 
     headerWidgets =
-      mconcat (izipWith headerWidgetPair columnDefs _mColumnWidths)
+      mconcat (izipWith headerWidgetPair columnDefs _mColumns)
 
-    headerWidgetPair i columnDef columnWidth = [btn, handle]
+    headerWidgetPair i columnDef column = [btn, handle]
       where
         btn = headerButton i columnDef
-        handle = headerDragHandle i columnDef columnWidth
+        handle = headerDragHandle i columnDef column
 
     headerPaneContainer =
       createContainer
-        _mColumnWidths
+        _mColumns
         def
           { containerGetSizeReq = headerGetSizeReq,
             containerResize = headerResize,
@@ -196,14 +226,14 @@ headerPane columnDefs HagridModel {..} = node
 
     headerGetSizeReq _wenv _node _children = (w, h)
       where
-        w = fixedSize (fromIntegral (sum _mColumnWidths))
+        w = fixedSize (sum (fromIntegral . _mcCurrentWidth <$> _mColumns))
         h = fixedSize dragHandleHeight
 
     headerResize _wenv node viewport _children = (resultNode node, assignedAreas)
       where
         Rect l t _w h = viewport
         widgetWidths = do
-          w <- _mColumnWidths
+          w <- _mcCurrentWidth <$> _mColumns
           [w - dragHandleWidth, dragHandleWidth]
         (assignedAreas, _) = foldl' assignArea (mempty, l) widgetWidths
         assignArea (areas, colX) columnWidth =
@@ -218,7 +248,7 @@ headerPane columnDefs HagridModel {..} = node
         style = wenv ^. L.theme . L.basic . L.btnStyle
         Rect l t _w h = node ^. L.info . L.viewport
         size = style ^. L.text . non def . L.fontSize . non def
-        colOffset = fromIntegral (sum (take (sortCol + 1) _mColumnWidths) - dragHandleWidth)
+        colOffset = fromIntegral (sum (take (sortCol + 1) (_mcCurrentWidth <$> _mColumns)) - dragHandleWidth)
         indW = unFontSize size * 2 / 3
         pad = indW / 3
         indT = case _mSortDirection of
@@ -232,8 +262,8 @@ headerButton colIndex ColumnDef {_cdName, _cdSortKey, _cdMinWidth} =
   button_ _cdName (OrderByColumn colIndex) [ellipsis]
     `styleBasic` [radius 0]
 
-headerDragHandle :: WidgetEvent ep => Int -> ColumnDef ep a -> Int -> WidgetNode s (HagridEvent ep)
-headerDragHandle colIndex ColumnDef {_cdName, _cdSortKey, _cdMinWidth} columnWidth = tree
+headerDragHandle :: WidgetEvent ep => Int -> ColumnDef ep a -> ModelColumn -> WidgetNode s (HagridEvent ep)
+headerDragHandle colIndex ColumnDef {_cdName, _cdSortKey, _cdMinWidth} ModelColumn {_mcCurrentWidth} = tree
   where
     tree = defaultWidgetNode "Hagrid.HeaderDragHandle" (headerDragHandleWidget Nothing)
 
@@ -262,7 +292,7 @@ headerDragHandle colIndex ColumnDef {_cdName, _cdSortKey, _cdMinWidth} columnWid
               -- todo: only if not focussed? set focus?
               result = resultNode newNode
               newNode = node & L.widget .~ headerDragHandleWidget newState
-              newState = Just (HeaderDragHandleState _pX columnWidth)
+              newState = Just (HeaderDragHandleState _pX _mcCurrentWidth)
           ButtonAction _point _btn BtnReleased _clicks -> Just result
             where
               result = resultReqs newNode [RaiseEvent (ResizeColumnFinished colIndex)]
@@ -315,7 +345,7 @@ contentPane columnDefs model@HagridModel {..} = node
 
     contentGetSizeReq _wenv _node children = (w, h)
       where
-        w = fixedSize (fromIntegral (sum _mColumnWidths))
+        w = fixedSize (sum (fromIntegral . _mcCurrentWidth <$> _mColumns))
         h = fixedSize (sum (toRowHeights children columnDefsSeq))
 
     contentResize wenv node viewport children = (resultNode node, assignedAreas)
@@ -323,7 +353,7 @@ contentPane columnDefs model@HagridModel {..} = node
         style = currentStyle wenv node
         Rect l t _w _h = fromMaybe def (removeOuterBounds style viewport)
 
-        colXs = sizesToPositions (S.fromList (fromIntegral <$> _mColumnWidths))
+        colXs = sizesToPositions (S.fromList (fromIntegral . _mcCurrentWidth <$> _mColumns))
         rowYs = sizesToPositions (toRowHeights children columnDefsSeq)
 
         assignedAreas = S.fromList $ do
@@ -352,7 +382,7 @@ contentPane columnDefs model@HagridModel {..} = node
       forM_ (S.drop 1 rowYs) $ \rowY -> do
         drawLine renderer (Point l (t + rowY)) (Point (l + lastColX) (t + rowY)) 1 (Just lineColor)
       where
-        colXs = sizesToPositions (S.fromList (fromIntegral <$> _mColumnWidths))
+        colXs = sizesToPositions (S.fromList (fromIntegral . _mcCurrentWidth <$> _mColumns))
         rowYs = sizesToPositions (toRowHeights (node ^. L.children) columnDefsSeq)
         lastColX
           | _ :|> a <- colXs = a
@@ -375,14 +405,21 @@ contentPane columnDefs model@HagridModel {..} = node
       _ -> Nothing
 
 initialModel :: [ColumnDef ep a] -> [a] -> HagridModel a
-initialModel columnDefs items =
-  sortItems columnDefs $
-    HagridModel
-      { _mSortedItems = items,
-        _mColumnWidths = _cdInitialWidth <$> columnDefs,
-        _mSortColumn = Nothing,
-        _mSortDirection = SortAscending
-      }
+initialModel columnDefs items = model
+  where
+    model =
+      sortItems columnDefs $
+        HagridModel
+          { _mSortedItems = items,
+            _mColumns = initialColumn <$> columnDefs,
+            _mSortColumn = Nothing,
+            _mSortDirection = SortAscending
+          }
+    initialColumn ColumnDef {_cdName, _cdInitialWidth} =
+      ModelColumn
+        { _mcName = _cdName,
+          _mcCurrentWidth = _cdInitialWidth
+        }
 
 headerPaneKey :: Text
 headerPaneKey = "Hagrid.headerPane"

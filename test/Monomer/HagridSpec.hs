@@ -21,6 +21,7 @@ spec :: Spec
 spec = do
   resize
   sorting
+  merging
 
 resize :: Spec
 resize = describe "resize" $ do
@@ -75,6 +76,16 @@ sorting = describe "sorting" $ do
   it "should sort by descending when column header clicked again" $ do
     pendingWith "not sure how to make this test work yet"
 
+merging :: Spec
+merging = describe "merging" $ do
+  it "should preserve column widths when items change" $ do
+    let col = textColumn "Col" (const "")
+        startNode = nodeInit wenv (hagrid [col `columnInitialWidth` 75] [TestItem (fixedSize 1)])
+        mergedNode = nodeMerge wenv (hagrid [col `columnInitialWidth` 64] [TestItem (fixedSize 2)]) startNode
+        resizedNode = nodeResize wenv mergedNode (mergedNode ^. L.info . L.viewport)
+    columnWidths startNode `shouldBe` [75]
+    columnWidths resizedNode `shouldBe` [75]
+
 -- | We test with custom widgets because these will create special "Hagrid.Cell" nodes in the widget
 -- tree that we can later use to pick out the cell widgets.
 testCellWidget :: (TestItem -> SizeReq) -> TestItem -> WidgetNode s TestEvent
@@ -95,6 +106,18 @@ cellViewports_ columnDefs items evts = Foldable.toList childVps
     node' = nodeHandleEventRoot wenv evts node
     node'' = widgetGetInstanceTree (node ^. L.widget) wenv node'
     childVps = roundRectUnits . _wniViewport . _winInfo <$> widgetsOfType "Hagrid.Cell" node''
+
+-- Extract the column widths by observing the locations of the special drag handle widgets
+columnWidths :: WidgetNode TestModel TestEvent -> [Int]
+columnWidths node = fromFractional <$> colWidths where
+  (_, colWidths) =
+    Foldable.foldl' (\(px, cws) (Rect x _y w _h) -> (x + w, (x + w - px) : cws)) (0, []) vps
+  vps =
+    _wniViewport . _winInfo <$> dragHandles
+  dragHandles =
+    widgetsOfType "Hagrid.HeaderDragHandle" instanceTree
+  instanceTree =
+    widgetGetInstanceTree (_wnWidget node) wenv node
 
 widgetsOfType :: WidgetType -> WidgetInstanceNode -> [WidgetInstanceNode]
 widgetsOfType typ node = thisOne <> childOnes
