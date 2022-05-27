@@ -1,9 +1,9 @@
-module HaGridSpec (spec) where
+module Monomer.HagridSpec (spec) where
 
 import Control.Lens ((&), (.~), (^.))
 import qualified Data.Foldable as Foldable
-import HaGrid
 import Monomer
+import Monomer.Hagrid
 import qualified Monomer.Lens as L
 import Monomer.TestUtil
 import Test.Hspec (Spec, describe, it, shouldBe)
@@ -48,7 +48,7 @@ resize = describe "resize" $ do
       [TestItem 0]
       `shouldBe` [Rect 0 40 50 47, Rect 50 40 50 47]
 
--- | We test with custom widgets because these will create special "HaGrid.Cell" nodes in the widget
+-- | We test with custom widgets because these will create special "Hagrid.Cell" nodes in the widget
 -- tree that we can later use to pick out the cell widgets.
 testCellWidget :: (TestItem -> Double) -> TestItem -> WidgetNode s TestEvent
 testCellWidget getHeight item = wgt
@@ -60,9 +60,9 @@ testCellWidget getHeight item = wgt
 cellViewports :: [ColumnDef TestEvent TestItem] -> [TestItem] -> [Rect]
 cellViewports columnDefs items = Foldable.toList childVps
   where
-    node = nodeInit wenv (haGrid columnDefs items)
+    node = nodeInit wenv (hagrid columnDefs items)
     node' = widgetGetInstanceTree (node ^. L.widget) wenv node
-    childVps = roundRectUnits . _wniViewport . _winInfo <$> widgetsOfType "HaGrid.Cell" node'
+    childVps = roundRectUnits . _wniViewport . _winInfo <$> widgetsOfType "Hagrid.Cell" node'
 
 widgetsOfType :: WidgetType -> WidgetInstanceNode -> [WidgetInstanceNode]
 widgetsOfType typ node = thisOne <> childOnes

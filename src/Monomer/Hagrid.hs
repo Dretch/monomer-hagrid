@@ -10,11 +10,11 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 
-module HaGrid
+module Monomer.Hagrid
   ( ColumnDef (..),
     ColumnSortKey (..),
     SortDirection (..),
-    haGrid,
+    hagrid,
     textColumn,
     showOrdColumn,
     widgetColumn,
@@ -50,7 +50,7 @@ import qualified Monomer.Lens as L
 import Monomer.Widgets.Container
 import Monomer.Widgets.Single
 
-data HaGridEvent ep
+data HagridEvent ep
   = OrderByColumn Int
   | ResizeColumn Int Int
   | ResizeColumnFinished Int
@@ -58,7 +58,7 @@ data HaGridEvent ep
 
 data ColumnDef e a = ColumnDef
   { _cdName :: Text,
-    _cdWidget :: a -> WidgetNode (HaGridModel a) (HaGridEvent e),
+    _cdWidget :: a -> WidgetNode (HagridModel a) (HagridEvent e),
     _cdSortKey :: ColumnSortKey a,
     _cdInitialWidth :: Int,
     _cdMinWidth :: Int,
@@ -77,7 +77,7 @@ data SortDirection
   | SortDescending
   deriving (Eq, Show)
 
-data HaGridModel a = HaGridModel
+data HagridModel a = HagridModel
   { _mSortedItems :: [a],
     _mColumnWidths :: [Int],
     _mSortColumn :: Maybe Int,
@@ -85,7 +85,7 @@ data HaGridModel a = HaGridModel
   }
   deriving (Eq, Show)
 
-makeLensesWith abbreviatedFields ''HaGridModel
+makeLensesWith abbreviatedFields ''HagridModel
 
 data HeaderDragHandleState = HeaderDragHandleState
   { _hdhsDragStartMouseX :: Double,
@@ -94,18 +94,18 @@ data HeaderDragHandleState = HeaderDragHandleState
   deriving (Eq, Show)
 
 -- todo: accept lens ?
-haGrid :: forall a s e. (CompositeModel a, WidgetModel s, WidgetEvent e) => [ColumnDef e a] -> [a] -> WidgetNode s e
-haGrid columnDefs items = widget
+hagrid :: forall a s e. (CompositeModel a, WidgetModel s, WidgetEvent e) => [ColumnDef e a] -> [a] -> WidgetNode s e
+hagrid columnDefs items = widget
   where
     widget =
       compositeD_
-        "HaGrid.Root"
+        "Hagrid.Root"
         (WidgetValue (initialModel columnDefs items))
         buildUI
         handleEvent
         []
 
-    buildUI :: UIBuilder (HaGridModel a) (HaGridEvent e)
+    buildUI :: UIBuilder (HagridModel a) (HagridEvent e)
     buildUI _wenv model = tree
       where
         tree =
@@ -115,7 +115,7 @@ haGrid columnDefs items = widget
                 vscroll (contentPane columnDefs model `nodeKey` contentPaneKey)
               ]
 
-    handleEvent :: EventHandler (HaGridModel a) (HaGridEvent e) sp e
+    handleEvent :: EventHandler (HagridModel a) (HagridEvent e) sp e
     handleEvent wenv _node model = \case
       OrderByColumn colIndex -> result
         where
@@ -166,11 +166,11 @@ accentColor wenv = transColor
     color = fromMaybe (rgb 255 255 255) (_sstText style >>= _txsFontColor)
     transColor = color {_colorA = 0.7}
 
-headerPane :: WidgetEvent ep => [ColumnDef ep a] -> HaGridModel a -> WidgetNode s (HaGridEvent ep)
-headerPane columnDefs HaGridModel {..} = node
+headerPane :: WidgetEvent ep => [ColumnDef ep a] -> HagridModel a -> WidgetNode s (HagridEvent ep)
+headerPane columnDefs HagridModel {..} = node
   where
     node =
-      defaultWidgetNode "HaGrid.HeaderPane" headerPaneContainer
+      defaultWidgetNode "Hagrid.HeaderPane" headerPaneContainer
         & L.children .~ S.fromList headerWidgets
 
     dragHandleWidth = 4
@@ -226,15 +226,15 @@ headerPane columnDefs HaGridModel {..} = node
         indL = l + colOffset - indW - pad
         indRect = Rect indL indT indW indW
 
-headerButton :: WidgetEvent ep => Int -> ColumnDef ep a -> WidgetNode s (HaGridEvent ep)
+headerButton :: WidgetEvent ep => Int -> ColumnDef ep a -> WidgetNode s (HagridEvent ep)
 headerButton colIndex ColumnDef {_cdName, _cdSortKey, _cdMinWidth} =
   button_ _cdName (OrderByColumn colIndex) [ellipsis]
     `styleBasic` [{- todo: textFont Font.bold, -} radius 0]
 
-headerDragHandle :: WidgetEvent ep => Int -> ColumnDef ep a -> Int -> WidgetNode s (HaGridEvent ep)
+headerDragHandle :: WidgetEvent ep => Int -> ColumnDef ep a -> Int -> WidgetNode s (HagridEvent ep)
 headerDragHandle colIndex ColumnDef {_cdName, _cdSortKey, _cdMinWidth} columnWidth = tree
   where
-    tree = defaultWidgetNode "HaGrid.HeaderDragHandle" (headerDragHandleWidget Nothing)
+    tree = defaultWidgetNode "Hagrid.HeaderDragHandle" (headerDragHandleWidget Nothing)
 
     headerDragHandleWidget state = single
       where
@@ -289,11 +289,11 @@ headerDragHandle colIndex ColumnDef {_cdName, _cdSortKey, _cdMinWidth} columnWid
           where
             vp = node ^. L.info . L.viewport
 
-contentPane :: (Typeable a, Eq a) => [ColumnDef ep a] -> HaGridModel a -> WidgetNode (HaGridModel a) (HaGridEvent ep)
-contentPane columnDefs model@HaGridModel {..} = node
+contentPane :: (Typeable a, Eq a) => [ColumnDef ep a] -> HagridModel a -> WidgetNode (HagridModel a) (HagridEvent ep)
+contentPane columnDefs model@HagridModel {..} = node
   where
     node =
-      defaultWidgetNode "HaGrid.ContentPane" contentPaneContainer
+      defaultWidgetNode "Hagrid.ContentPane" contentPaneContainer
 
     childWidgetRows =
       [[_cdWidget item | ColumnDef {_cdWidget} <- columnDefs] | item <- _mSortedItems]
@@ -319,7 +319,7 @@ contentPane columnDefs model@HaGridModel {..} = node
           node
             & L.children .~ S.fromList (mconcat childWidgetRows)
 
-    contentMerge _wenv node oldNode HaGridModel {_mSortedItems = oldSortedItems} = resultNode newNode
+    contentMerge _wenv node oldNode HagridModel {_mSortedItems = oldSortedItems} = resultNode newNode
       where
         newNode = node & L.children .~ nodeChildren
         -- re-use the old children if possible, since creating all
@@ -389,10 +389,10 @@ contentPane columnDefs model@HaGridModel {..} = node
         Just (resultReqs node [RenderOnce])
       _ -> Nothing
 
-initialModel :: [ColumnDef ep a] -> [a] -> HaGridModel a
+initialModel :: [ColumnDef ep a] -> [a] -> HagridModel a
 initialModel columnDefs items =
   sortItems columnDefs $
-    HaGridModel
+    HagridModel
       { _mSortedItems = items,
         _mColumnWidths = _cdInitialWidth <$> columnDefs,
         _mSortColumn = Nothing,
@@ -400,12 +400,12 @@ initialModel columnDefs items =
       }
 
 headerPaneKey :: Text
-headerPaneKey = "HaGrid.headerPane"
+headerPaneKey = "Hagrid.headerPane"
 
 contentPaneKey :: Text
-contentPaneKey = "HaGrid.contentPane"
+contentPaneKey = "Hagrid.contentPane"
 
-sortItems :: [ColumnDef ep a] -> HaGridModel a -> HaGridModel a
+sortItems :: [ColumnDef ep a] -> HagridModel a -> HagridModel a
 sortItems columnDefs model = case model ^. sortColumn of
   Just sc
     | ColumnDef {_cdSortKey = SortWith f} <- columnDefs !! sc ->
@@ -454,13 +454,13 @@ widgetColumn :: (Typeable a, Eq a, WidgetEvent e) => Text -> (forall s. a -> Wid
 widgetColumn _cdName get = defaultColumn _cdName _cdWidget
   where
     _cdWidget item =
-      compositeD_ "HaGrid.Cell" (WidgetValue item) buildUI handleEvent []
+      compositeD_ "Hagrid.Cell" (WidgetValue item) buildUI handleEvent []
     buildUI _wenv model =
       get model
     handleEvent _wenv _node _model e =
       [Report (ParentEvent e)]
 
-defaultColumn :: Text -> (a -> WidgetNode (HaGridModel a) (HaGridEvent e)) -> ColumnDef e a
+defaultColumn :: Text -> (a -> WidgetNode (HagridModel a) (HagridEvent e)) -> ColumnDef e a
 defaultColumn _cdName _cdWidget =
   ColumnDef
     { _cdName,

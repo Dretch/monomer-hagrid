@@ -1,5 +1,4 @@
-# todo: rename to monomer-???
-name:                hagrid
+name:                monomer-hagrid
 version:             0.0.1.0
 license:             WTFPL
 
@@ -26,7 +25,7 @@ executables:
     default-extensions:
       - OverloadedStrings
     dependencies:
-      - hagrid
+      - monomer-hagrid
       - time
 
 tests:
@@ -38,6 +37,6 @@ tests:
     dependencies:
       - bytestring
       - data-default
-      - hagrid
+      - monomer-hagrid
       - mtl
       - stm

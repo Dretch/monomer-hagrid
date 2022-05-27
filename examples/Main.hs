@@ -14,7 +14,7 @@ import Control.Lens (abbreviatedFields, ix, makeLensesWith, singular, (^.))
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time (Day, addDays, defaultTimeLocale, formatTime, fromGregorian)
-import HaGrid (ColumnDef (..), ColumnSortKey (SortWith), SortDirection, columnInitialWidth, columnPadding, columnResizeHandler, columnSortHandler, columnSortKey, haGrid, showOrdColumn, textColumn, widgetColumn)
+import Monomer.Hagrid (ColumnDef (..), ColumnSortKey (SortWith), SortDirection, columnInitialWidth, columnPadding, columnResizeHandler, columnSortHandler, columnSortKey, hagrid, showOrdColumn, textColumn, widgetColumn)
 import Monomer
 import Text.Printf (printf)
 
@@ -31,7 +31,7 @@ newtype AppColumn = AppColumn
 data AppEvent
   = FeedSpider Text
   | NameColumnResized Int
-  | NameColumnSorted HaGrid.SortDirection
+  | NameColumnSorted SortDirection
 
 data Spider = Spider
   { _sIndex :: Integer,
@@ -49,7 +49,7 @@ main :: IO ()
 main = startApp model handleEvent buildUI config
   where
     config =
-      [ appWindowTitle "HaGrid Examples",
+      [ appWindowTitle "Hagrid Examples",
         appFontDef "Regular" "./assets/fonts/Cantarell/Cantarell-Regular.ttf",
         appTheme darkTheme,
         appDisableAutoScale True
@@ -80,14 +80,14 @@ buildUI _wenv model = tree
         ]
 
     grid =
-      HaGrid.haGrid
+      hagrid
         (mconcat (zipWith column (model ^. columns) gridColumns))
         (_appSpiders model)
 
     column (AppColumn enabled) columnDef =
       [columnDef | enabled]
 
-    columnConfigurer :: Int -> HaGrid.ColumnDef AppEvent Spider -> WidgetNode AppModel AppEvent
+    columnConfigurer :: Int -> ColumnDef AppEvent Spider -> WidgetNode AppModel AppEvent
     columnConfigurer idx columnDef =
       labeledCheckbox_
         (_cdName columnDef) -- todo: somehow export getters but not setters?
@@ -103,25 +103,25 @@ handleEvent _wenv _node _model = \case
   NameColumnSorted direction ->
     [Producer (const (putStrLn ("Name column was sorted: " <> show direction)))]
 
-gridColumns :: [HaGrid.ColumnDef AppEvent Spider]
+gridColumns :: [ColumnDef AppEvent Spider]
 gridColumns = cols
   where
     cols =
-      [ HaGrid.showOrdColumn "Index" _sIndex,
-        HaGrid.textColumn "Name" _sName
-          `HaGrid.columnInitialWidth` 300
-          `HaGrid.columnResizeHandler` NameColumnResized
-          `HaGrid.columnSortHandler` NameColumnSorted,
-        HaGrid.textColumn "Species" _sSpecies
-          `HaGrid.columnInitialWidth` 200,
-        HaGrid.textColumn "Date of Birth" (T.pack . formatTime defaultTimeLocale "%Y-%m-%d" . _sDateOfBirth)
-          `HaGrid.columnInitialWidth` 200,
-        HaGrid.textColumn "Weight (Kg)" (T.pack . printf "%.2f" . _sWeightKilos)
-          `HaGrid.columnSortKey` HaGrid.SortWith _sWeightKilos
-          `HaGrid.columnInitialWidth` 200,
-        HaGrid.widgetColumn "Actions" actionsColumn
-          `HaGrid.columnInitialWidth` 100
-          `HaGrid.columnPadding` 5
+      [ showOrdColumn "Index" _sIndex,
+        textColumn "Name" _sName
+          `columnInitialWidth` 300
+          `columnResizeHandler` NameColumnResized
+          `columnSortHandler` NameColumnSorted,
+        textColumn "Species" _sSpecies
+          `columnInitialWidth` 200,
+        textColumn "Date of Birth" (T.pack . formatTime defaultTimeLocale "%Y-%m-%d" . _sDateOfBirth)
+          `columnInitialWidth` 200,
+        textColumn "Weight (Kg)" (T.pack . printf "%.2f" . _sWeightKilos)
+          `columnSortKey` SortWith _sWeightKilos
+          `columnInitialWidth` 200,
+        widgetColumn "Actions" actionsColumn
+          `columnInitialWidth` 100
+          `columnPadding` 5
       ]
     actionsColumn spdr =
       button "Feed" (FeedSpider (_sName spdr))

@@ -1,6 +1,6 @@
-# Haskell Grid (HaGrid)
+# Monomer-Hagrid
 
-A datagrid for the [Monomer](https://github.com/fjvallarino/monomer) library.
+A datagrid widget for the [Monomer](https://github.com/fjvallarino/monomer) library.
 
 # Goals
 - Have complete and helpful documentation.
