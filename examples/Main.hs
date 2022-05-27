@@ -56,7 +56,7 @@ main = startApp model handleEvent buildUI config
       ]
     model =
       AppModel
-        { _appTheme = lightTheme,
+        { _appTheme = darkTheme,
           _appSpiders = spiders,
           _appColumns = AppColumn True <$ gridColumns
         }
