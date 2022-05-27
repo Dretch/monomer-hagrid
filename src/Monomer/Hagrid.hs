@@ -329,7 +329,7 @@ contentPane columnDefs model@HagridModel {..} = node
           | otherwise = S.fromList (mconcat childWidgetRows)
         zeroColumnWidths :: HagridModel a -> HagridModel a
         zeroColumnWidths model =
-          model & columnWidths %~ (map (const 0)) 
+          model & columnWidths %~ (map (const 0))
 
     contentGetSizeReq _wenv _node children = (w, h)
       where
@@ -431,8 +431,7 @@ toRowHeights children columnDefs = mergeHeights <$> S.chunksOf (length columnDef
       widget
         & _wnInfo
         & _wniSizeReqH
-        & _szrFixed
-        & (+ (_cdPaddingH * 2))
+        & \r -> _szrFixed r + _szrFlex r + _cdPaddingH * 2
 
 neighbours :: Seq a -> Seq (a, a, Bool)
 neighbours = \case

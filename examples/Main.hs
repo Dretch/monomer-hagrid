@@ -14,8 +14,8 @@ import Control.Lens (abbreviatedFields, ix, makeLensesWith, singular, (^.))
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time (Day, addDays, defaultTimeLocale, formatTime, fromGregorian)
-import Monomer.Hagrid (ColumnDef (..), ColumnSortKey (SortWith), SortDirection, columnInitialWidth, columnPadding, columnResizeHandler, columnSortHandler, columnSortKey, hagrid, showOrdColumn, textColumn, widgetColumn)
 import Monomer
+import Monomer.Hagrid (ColumnDef (..), ColumnSortKey (SortWith), SortDirection, columnInitialWidth, columnPadding, columnResizeHandler, columnSortHandler, columnSortKey, hagrid, showOrdColumn, textColumn, widgetColumn)
 import Text.Printf (printf)
 
 data AppModel = AppModel
