@@ -319,14 +319,17 @@ contentPane columnDefs model@HagridModel {..} = node
           node
             & L.children .~ S.fromList (mconcat childWidgetRows)
 
-    contentMerge _wenv node oldNode HagridModel {_mSortedItems = oldSortedItems} = resultNode newNode
+    contentMerge _wenv node oldNode oldModel = resultNode newNode
       where
         newNode = node & L.children .~ nodeChildren
-        -- re-use the old children if possible, since creating all
-        -- those labels does lots of expensive font-layout stuff
+        -- re-use the old children if only column widths have changed, since
+        -- creating all those labels does lots of expensive font-layout stuff
         nodeChildren
-          | _mSortedItems == oldSortedItems = oldNode ^. L.children
+          | zeroColumnWidths model == zeroColumnWidths oldModel = oldNode ^. L.children
           | otherwise = S.fromList (mconcat childWidgetRows)
+        zeroColumnWidths :: HagridModel a -> HagridModel a
+        zeroColumnWidths model =
+          model & columnWidths %~ (map (const 0)) 
 
     contentGetSizeReq _wenv _node children = (w, h)
       where
