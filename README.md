@@ -2,7 +2,10 @@
 
 A datagrid widget for the [Monomer](https://github.com/fjvallarino/monomer) library.
 
-# Goals
+## Current Status
+- Buggy and incomplete. Just a toy.
+
+## Goals
 - Have complete and helpful documentation.
 - Be reasonably configurable and inspectable.
 - Be no uglier than standard Monomer widgets.
@@ -14,7 +17,12 @@ A datagrid widget for the [Monomer](https://github.com/fjvallarino/monomer) libr
 stack run
 ```
 
-## To format the source code
+## Contribution Guide
+- This is "free as in mattress" software!
+- You are welcome to open an issue with comments and feature requests, but you may not get a response.
+- Unsolicited pull requests will likely be ignored.
+
+### To format the source code
 
 ```bash
 ormolu --mode inplace $(find . -name '*.hs')
