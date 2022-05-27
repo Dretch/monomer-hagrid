@@ -229,7 +229,7 @@ headerPane columnDefs HagridModel {..} = node
 headerButton :: WidgetEvent ep => Int -> ColumnDef ep a -> WidgetNode s (HagridEvent ep)
 headerButton colIndex ColumnDef {_cdName, _cdSortKey, _cdMinWidth} =
   button_ _cdName (OrderByColumn colIndex) [ellipsis]
-    `styleBasic` [{- todo: textFont Font.bold, -} radius 0]
+    `styleBasic` [radius 0]
 
 headerDragHandle :: WidgetEvent ep => Int -> ColumnDef ep a -> Int -> WidgetNode s (HagridEvent ep)
 headerDragHandle colIndex ColumnDef {_cdName, _cdSortKey, _cdMinWidth} columnWidth = tree
