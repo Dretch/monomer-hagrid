@@ -1,7 +1,3 @@
-{-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -10,23 +6,23 @@
 
 module Main (main) where
 
-import Control.Lens (abbreviatedFields, ix, makeLensesWith, singular, (^.))
+import Control.Lens (Ixed (ix), makeLensesFor, singular)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time (Day, addDays, defaultTimeLocale, formatTime, fromGregorian)
 import Monomer
-import Monomer.Hagrid (ColumnDef (..), ColumnSortKey (SortWith), SortDirection, columnInitialWidth, columnPadding, columnResizeHandler, columnSortHandler, columnSortKey, hagrid, showOrdColumn, textColumn, widgetColumn)
+import Monomer.Hagrid (ColumnDef (..), ColumnSortKey (SortWith), SortDirection, hagrid, showOrdColumn, textColumn, widgetColumn)
 import Text.Printf (printf)
 
 data AppModel = AppModel
-  { _appTheme :: Theme,
-    _appSpiders :: [Spider],
-    _appColumns :: [AppColumn]
+  { theme :: Theme,
+    spiders :: [Spider],
+    columns :: [AppColumn]
   }
   deriving (Eq, Show)
 
 newtype AppColumn = AppColumn
-  {_acEnabled :: Bool}
+  {enabled :: Bool}
   deriving (Eq, Show)
 
 data AppEvent
@@ -35,16 +31,16 @@ data AppEvent
   | NameColumnSorted SortDirection
 
 data Spider = Spider
-  { _sIndex :: Integer,
-    _sSpecies :: Text,
-    _sName :: Text,
-    _sDateOfBirth :: Day,
-    _sWeightKilos :: Double
+  { index :: Integer,
+    species :: Text,
+    name :: Text,
+    dateOfBirth :: Day,
+    weightKilos :: Double
   }
   deriving (Eq, Show)
 
-makeLensesWith abbreviatedFields ''AppColumn
-makeLensesWith abbreviatedFields ''AppModel
+makeLensesFor [("enabled", "_enabled")] ''AppColumn
+makeLensesFor [("columns", "_columns"), ("theme", "_theme")] ''AppModel
 
 main :: IO ()
 main = startApp model handleEvent buildUI config
@@ -56,18 +52,18 @@ main = startApp model handleEvent buildUI config
       ]
     model =
       AppModel
-        { _appTheme = darkTheme,
-          _appSpiders = spiders,
-          _appColumns = AppColumn True <$ gridColumns
+        { theme = darkTheme,
+          spiders = spiders,
+          columns = AppColumn True <$ gridColumns
         }
     spiders = spider <$> [1 .. numSpiders]
     spider i =
       Spider
-        { _sIndex = i,
-          _sSpecies = "Acromantula",
-          _sName = T.pack (printf "Son of Aragog %d" i),
-          _sDateOfBirth = addDays i (fromGregorian 1942 3 0),
-          _sWeightKilos = fromIntegral (numSpiders + 1 - i) * 2.3
+        { index = i,
+          species = "Acromantula",
+          name = T.pack (printf "Son of Aragog %d" i),
+          dateOfBirth = addDays i (fromGregorian 1942 3 0),
+          weightKilos = fromIntegral (numSpiders + 1 - i) * 2.3
         }
     numSpiders = 100
 
@@ -75,7 +71,7 @@ buildUI :: UIBuilder AppModel AppEvent
 buildUI _wenv model = tree
   where
     tree =
-      themeSwitch_ (_appTheme model) [themeClearBg] $
+      themeSwitch_ model.theme [themeClearBg] $
         vstack
           [ grid,
             vstack_
@@ -86,8 +82,8 @@ buildUI _wenv model = tree
 
     grid =
       hagrid
-        (mconcat (zipWith column (model ^. columns) gridColumns))
-        (_appSpiders model)
+        (mconcat (zipWith column model.columns gridColumns))
+        model.spiders
 
     column (AppColumn enabled) columnDef =
       [columnDef | enabled]
@@ -95,18 +91,18 @@ buildUI _wenv model = tree
     themeConfigurer =
       hstack_
         [childSpacing]
-        [ labeledRadio_ "Dark Theme" darkTheme theme [textRight],
-          labeledRadio_ "Light Theme" lightTheme theme [textRight]
+        [ labeledRadio_ "Dark Theme" darkTheme _theme [textRight],
+          labeledRadio_ "Light Theme" lightTheme _theme [textRight]
         ]
 
     columnConfigurers =
-      zipWith columnConfigurer [0 .. length (model ^. columns) - 1] gridColumns
+      zipWith columnConfigurer [0 .. length model.columns - 1] gridColumns
 
     columnConfigurer :: Int -> ColumnDef AppEvent Spider -> WidgetNode AppModel AppEvent
     columnConfigurer idx columnDef =
       labeledCheckbox_
-        (_cdName columnDef) -- todo: somehow export getters but not setters?
-        (columns . singular (ix idx) . enabled)
+        columnDef.name
+        (_columns . singular (ix idx) . _enabled)
         [textRight]
 
 handleEvent :: EventHandler AppModel AppEvent sp ep
@@ -122,21 +118,28 @@ gridColumns :: [ColumnDef AppEvent Spider]
 gridColumns = cols
   where
     cols =
-      [ showOrdColumn "Index" _sIndex,
-        textColumn "Name" _sName
-          `columnInitialWidth` 300
-          `columnResizeHandler` NameColumnResized
-          `columnSortHandler` NameColumnSorted,
-        textColumn "Species" _sSpecies
-          `columnInitialWidth` 200,
-        textColumn "Date of Birth" (T.pack . formatTime defaultTimeLocale "%Y-%m-%d" . _sDateOfBirth)
-          `columnInitialWidth` 200,
-        textColumn "Weight (Kg)" (T.pack . printf "%.2f" . _sWeightKilos)
-          `columnSortKey` SortWith _sWeightKilos
-          `columnInitialWidth` 200,
-        widgetColumn "Actions" actionsColumn
-          `columnInitialWidth` 100
-          `columnPadding` 5
+      [ showOrdColumn "Index" (.index),
+        (textColumn "Name" (.name))
+          { initialWidth = 300,
+            resizeHandler = Just NameColumnResized,
+            sortHandler = Just NameColumnSorted
+          },
+        (textColumn "Species" (.species))
+          { initialWidth = 200
+          },
+        (textColumn "Date of Birth" (T.pack . formatTime defaultTimeLocale "%Y-%m-%d" . dateOfBirth))
+          { initialWidth = 200
+          },
+        (textColumn "Weight (Kg)" (T.pack . printf "%.2f" . weightKilos))
+          { sortKey = SortWith weightKilos,
+            initialWidth = 200
+          },
+        (widgetColumn "Actions" actionsColumn)
+          { initialWidth = 100,
+            paddingW = 5,
+            paddingH = 5
+          }
       ]
+    actionsColumn :: Spider -> WidgetNode s AppEvent
     actionsColumn spdr =
-      button "Feed" (FeedSpider (_sName spdr))
+      button "Feed" (FeedSpider spdr.name)

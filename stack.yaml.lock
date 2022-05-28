@@ -5,33 +5,30 @@
 
 packages:
 - completed:
-    hackage: extra-1.7.10@sha256:e384751317577554f873812358fab022da02aa9a286c9341308fac83f4d766c5,2691
-    pantry-tree:
-      size: 1896
-      sha256: fe513979693efb8777d5afdaf45ed6d958d09b3e9eb002ebbe6c297602d9f1cd
-  original:
-    hackage: extra-1.7.10
-- completed:
-    hackage: nanovg-0.8.0.0@sha256:224b71e26be44d80e76d4bfc8633aa74dae4b5675109781d57783b75f7aa74ef,4914
-    pantry-tree:
-      size: 2558
-      sha256: c03390da9e9dd47b259c441611baf8afd4026d9de69190e175d94957cf78816b
-  original:
-    hackage: nanovg-0.8.0.0
-- completed:
     name: monomer
     version: 1.4.1.0
-    git: https://github.com/fjvallarino/monomer
+    git: https://github.com/Dretch/monomer
     pantry-tree:
       size: 17335
-      sha256: b673be0eb52eaea289d4c20186fcb5abc338b5272994d8630fde9d2a3e2098f7
-    commit: 55ae7f88f1da80064fa3dc6ce6cfb4fce47e8e5a
+      sha256: ed9be15a412023f4a71fa8d82facdebe25d5ceb36ecf3e2e6204aa1d9aab016b
+    commit: e2870908a5a632209056f1de338b112676a643b4
   original:
-    git: https://github.com/fjvallarino/monomer
-    commit: 55ae7f88f1da80064fa3dc6ce6cfb4fce47e8e5a
+    git: https://github.com/Dretch/monomer
+    commit: e2870908a5a632209056f1de338b112676a643b4
+- completed:
+    name: sdl2
+    version: 2.5.3.2
+    git: https://github.com/haskell-game/sdl2
+    pantry-tree:
+      size: 7086
+      sha256: 62403665bb98fbf4a25b9e9b117bab709534f3c9a919da6dbf78c99764fa33fe
+    commit: b4fe21c1025e4be9a1eb03c19f811e1776a2b292
+  original:
+    git: https://github.com/haskell-game/sdl2
+    commit: b4fe21c1025e4be9a1eb03c19f811e1776a2b292
 snapshots:
 - completed:
-    size: 590100
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/18/28.yaml
-    sha256: 428ec8d5ce932190d3cbe266b9eb3c175cd81e984babf876b64019e2cbe4ea68
-  original: lts-18.28
+    size: 590824
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2022/5/28.yaml
+    sha256: 1b1fbecac3fc9c8efb60b85fd7ce635c8278d0080a66c2ba0d6e4c03773f5f64
+  original: nightly-2022-05-28

@@ -14,6 +14,9 @@ dependencies:
 library:
   source-dirs: src
   default-extensions:
+    - DisambiguateRecordFields
+    - DuplicateRecordFields
+    - OverloadedRecordDot
     - OverloadedStrings
   ghc-options: -O2 -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints
 
@@ -23,6 +26,9 @@ executables:
     source-dirs: examples
     ghc-options: -O2 -threaded -rtsopts -with-rtsopts=-N -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints
     default-extensions:
+      - DisambiguateRecordFields
+      - DuplicateRecordFields
+      - OverloadedRecordDot
       - OverloadedStrings
     dependencies:
       - monomer-hagrid
@@ -33,6 +39,9 @@ tests:
     defaults: hspec/hspec@master
     ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints
     default-extensions:
+      - DisambiguateRecordFields
+      - DuplicateRecordFields
+      - OverloadedRecordDot
       - OverloadedStrings
     dependencies:
       - bytestring

@@ -1,13 +1,8 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
@@ -19,28 +14,10 @@ module Monomer.Hagrid
     textColumn,
     showOrdColumn,
     widgetColumn,
-    columnInitialWidth,
-    columnMinWidth,
-    columnSortKey,
-    columnPadding,
-    columnPaddingW,
-    columnPaddingH,
-    columnResizeHandler,
-    columnSortHandler,
   )
 where
 
-import Control.Lens
-  ( abbreviatedFields,
-    ix,
-    makeLensesWith,
-    singular,
-    (%~),
-    (.~),
-    (<>~),
-    (?~),
-    (^.),
-  )
+import Control.Lens ((.~), (<>~), (^.))
 import Control.Lens.Combinators (non)
 import Control.Lens.Lens ((&))
 import Control.Monad as X (forM_)
@@ -68,15 +45,15 @@ data HagridEvent ep
   | ParentEvent ep
 
 data ColumnDef e a = ColumnDef
-  { _cdName :: Text,
-    _cdWidget :: a -> WidgetNode (HagridModel a) (HagridEvent e),
-    _cdSortKey :: ColumnSortKey a,
-    _cdInitialWidth :: Int,
-    _cdMinWidth :: Int,
-    _cdPaddingW :: Double,
-    _cdPaddingH :: Double,
-    _cdResizeHandler :: Maybe (Int -> e),
-    _cdSortHandler :: Maybe (SortDirection -> e)
+  { name :: Text,
+    widget :: a -> WidgetNode (HagridModel a) (HagridEvent e),
+    sortKey :: ColumnSortKey a,
+    initialWidth :: Int,
+    minWidth :: Int,
+    paddingW :: Double,
+    paddingH :: Double,
+    resizeHandler :: Maybe (Int -> e),
+    sortHandler :: Maybe (SortDirection -> e)
   }
 
 data ColumnSortKey a where
@@ -89,25 +66,22 @@ data SortDirection
   deriving (Eq, Show)
 
 data HagridModel a = HagridModel
-  { _mSortedItems :: [a],
-    _mColumns :: [ModelColumn],
-    _mSortColumn :: Maybe Int,
-    _mSortDirection :: SortDirection
+  { sortedItems :: [a],
+    columns :: [ModelColumn],
+    sortColumn :: Maybe Int,
+    sortDirection :: SortDirection
   }
   deriving (Eq, Show)
 
 data ModelColumn = ModelColumn
-  { _mcCurrentWidth :: Int,
-    _mcName :: Text
+  { currentWidth :: Int,
+    name :: Text
   }
   deriving (Eq, Show)
 
-makeLensesWith abbreviatedFields ''HagridModel
-makeLensesWith abbreviatedFields ''ModelColumn
-
 data HeaderDragHandleState = HeaderDragHandleState
-  { _hdhsDragStartMouseX :: Double,
-    _hdhsDragStartColumnW :: Int
+  { dragStartMouseX :: Double,
+    dragStartColumnW :: Int
   }
   deriving (Eq, Show)
 
@@ -137,28 +111,28 @@ hagrid columnDefs items = widget
     handleEvent wenv _node model = \case
       OrderByColumn colIndex -> result
         where
-          ColumnDef {_cdSortKey, _cdSortHandler} = columnDefs !! colIndex
+          ColumnDef {sortHandler} = columnDefs !! colIndex
           newModel
-            | Just c <- (model ^. sortColumn),
+            | Just c <- model.sortColumn,
               c == colIndex =
-                model & sortDirection %~ flipSortDirection
+                model {sortDirection = flipSortDirection model.sortDirection}
             | otherwise =
-                model & sortColumn ?~ colIndex & sortDirection .~ SortAscending
+                model {sortColumn = Just colIndex, sortDirection = SortAscending}
           result =
             Model (sortItems columnDefs newModel) : handler
           handler =
-            Report <$> maybeToList (_cdSortHandler <*> Just (newModel ^. sortDirection))
+            Report <$> maybeToList (sortHandler <*> Just newModel.sortDirection)
       ResizeColumn colIndex newWidth ->
-        [ Model (model & columns %~ modifyAt colIndex (currentWidth .~ newWidth)),
+        [ Model (model {columns = modifyAt colIndex (\c -> c {currentWidth = newWidth}) model.columns}),
           Request (ResizeWidgets headerPaneId),
           Request (ResizeWidgets contentPaneId)
         ]
       ResizeColumnFinished colIndex -> result
         where
-          finalWidth = model ^. columns . singular (ix colIndex) . currentWidth
-          ColumnDef {_cdResizeHandler} = columnDefs !! colIndex
+          ModelColumn {currentWidth} = model.columns !! colIndex
+          ColumnDef {resizeHandler} = columnDefs !! colIndex
           result =
-            Report <$> maybeToList (_cdResizeHandler <*> Just finalWidth)
+            Report <$> maybeToList (resizeHandler <*> Just currentWidth)
       ParentEvent e ->
         [Report e]
       where
@@ -172,11 +146,11 @@ hagrid columnDefs items = widget
       where
         resultModel
           | columnNames oldModel == columnNames newModel =
-              newModel & columns .~ (oldModel ^. columns)
+              newModel {columns = oldModel.columns}
           | otherwise =
               newModel
         columnNames m =
-          _mcName <$> _mColumns m
+          (.name) <$> columns m
 
 drawSortIndicator :: Renderer -> Rect -> Maybe Color -> SortDirection -> IO ()
 drawSortIndicator renderer rect color dir = drawCmd
@@ -198,7 +172,7 @@ accentColor wenv = transColor
     transColor = color {_colorA = 0.7}
 
 headerPane :: WidgetEvent ep => [ColumnDef ep a] -> HagridModel a -> WidgetNode s (HagridEvent ep)
-headerPane columnDefs HagridModel {..} = node
+headerPane columnDefs model = node
   where
     node =
       defaultWidgetNode "Hagrid.HeaderPane" headerPaneContainer
@@ -208,7 +182,7 @@ headerPane columnDefs HagridModel {..} = node
     dragHandleHeight = 40
 
     headerWidgets =
-      mconcat (izipWith headerWidgetPair columnDefs _mColumns)
+      mconcat (izipWith headerWidgetPair columnDefs model.columns)
 
     headerWidgetPair i columnDef column = [btn, handle]
       where
@@ -217,7 +191,7 @@ headerPane columnDefs HagridModel {..} = node
 
     headerPaneContainer =
       createContainer
-        _mColumns
+        model.columns
         def
           { containerGetSizeReq = headerGetSizeReq,
             containerResize = headerResize,
@@ -226,44 +200,44 @@ headerPane columnDefs HagridModel {..} = node
 
     headerGetSizeReq _wenv _node _children = (w, h)
       where
-        w = fixedSize (sum (fromIntegral . _mcCurrentWidth <$> _mColumns))
+        w = fixedSize (sum (fromIntegral . currentWidth <$> model.columns))
         h = fixedSize dragHandleHeight
 
     headerResize _wenv node viewport _children = (resultNode node, assignedAreas)
       where
         Rect l t _w h = viewport
         widgetWidths = do
-          w <- _mcCurrentWidth <$> _mColumns
+          w <- currentWidth <$> model.columns
           [w - dragHandleWidth, dragHandleWidth]
         (assignedAreas, _) = foldl' assignArea (mempty, l) widgetWidths
         assignArea (areas, colX) columnWidth =
           (areas S.:|> Rect colX t (fromIntegral columnWidth) h, colX + fromIntegral columnWidth)
 
     headerRenderAfter wenv node renderer =
-      forM_ _mSortColumn (renderSortIndicator wenv node renderer)
+      forM_ model.sortColumn (renderSortIndicator wenv node renderer)
 
     renderSortIndicator wenv node renderer sortCol = do
-      drawSortIndicator renderer indRect (Just (accentColor wenv)) _mSortDirection
+      drawSortIndicator renderer indRect (Just (accentColor wenv)) model.sortDirection
       where
         style = wenv ^. L.theme . L.basic . L.btnStyle
         Rect l t _w h = node ^. L.info . L.viewport
         size = style ^. L.text . non def . L.fontSize . non def
-        colOffset = fromIntegral (sum (take (sortCol + 1) (_mcCurrentWidth <$> _mColumns)) - dragHandleWidth)
+        colOffset = fromIntegral (sum (take (sortCol + 1) (currentWidth <$> model.columns)) - dragHandleWidth)
         indW = unFontSize size * 2 / 3
         pad = indW / 3
-        indT = case _mSortDirection of
+        indT = case model.sortDirection of
           SortAscending -> h - pad - indW
           SortDescending -> t + pad
         indL = l + colOffset - indW - pad
         indRect = Rect indL indT indW indW
 
 headerButton :: WidgetEvent ep => Int -> ColumnDef ep a -> WidgetNode s (HagridEvent ep)
-headerButton colIndex ColumnDef {_cdName, _cdSortKey, _cdMinWidth} =
-  button_ _cdName (OrderByColumn colIndex) [ellipsis]
+headerButton colIndex columnDef =
+  button_ columnDef.name (OrderByColumn colIndex) [ellipsis]
     `styleBasic` [radius 0]
 
 headerDragHandle :: WidgetEvent ep => Int -> ColumnDef ep a -> ModelColumn -> WidgetNode s (HagridEvent ep)
-headerDragHandle colIndex ColumnDef {_cdName, _cdSortKey, _cdMinWidth} ModelColumn {_mcCurrentWidth} = tree
+headerDragHandle colIndex columnDef column = tree
   where
     tree = defaultWidgetNode "Hagrid.HeaderDragHandle" (headerDragHandleWidget Nothing)
 
@@ -292,7 +266,7 @@ headerDragHandle colIndex ColumnDef {_cdName, _cdSortKey, _cdMinWidth} ModelColu
               -- todo: only if not focussed? set focus?
               result = resultNode newNode
               newNode = node & L.widget .~ headerDragHandleWidget newState
-              newState = Just (HeaderDragHandleState _pX _mcCurrentWidth)
+              newState = Just (HeaderDragHandleState _pX column.currentWidth)
           ButtonAction _point _btn BtnReleased _clicks -> Just result
             where
               result = resultReqs newNode [RaiseEvent (ResizeColumnFinished colIndex)]
@@ -301,14 +275,15 @@ headerDragHandle colIndex ColumnDef {_cdName, _cdSortKey, _cdMinWidth} ModelColu
             where
               result
                 | Just nw <- newColumnW =
-                    resizeRequest & L.requests
-                      <>~ S.fromList
-                        [RaiseEvent (ResizeColumn colIndex nw)]
+                    resizeRequest
+                      & L.requests
+                        <>~ S.fromList
+                          [RaiseEvent (ResizeColumn colIndex nw)]
                 | otherwise =
                     resultReqs node []
               newColumnW = do
                 HeaderDragHandleState clickX columnW <- state
-                pure (max _cdMinWidth (columnW + fromFractional (_pX - clickX)))
+                pure (max columnDef.minWidth (columnW + fromFractional (_pX - clickX)))
           _ -> Nothing
           where
             resizeRequest = widgetResize (node ^. L.widget) wenv node vp (const True)
@@ -321,16 +296,16 @@ headerDragHandle colIndex ColumnDef {_cdName, _cdSortKey, _cdMinWidth} ModelColu
             vp = node ^. L.info . L.viewport
 
 contentPane :: Typeable a => [ColumnDef ep a] -> HagridModel a -> WidgetNode (HagridModel a) (HagridEvent ep)
-contentPane columnDefs model@HagridModel {..} = node
+contentPane columnDefs model = node
   where
     node =
       defaultWidgetNode "Hagrid.ContentPane" contentPaneContainer
         & L.children .~ S.fromList (mconcat childWidgetRows)
 
     childWidgetRows =
-      [[_cdWidget item | ColumnDef {_cdWidget} <- columnDefs] | item <- _mSortedItems]
+      [[widget item | ColumnDef {widget} <- columnDefs] | item <- model.sortedItems]
 
-    nRows = length _mSortedItems
+    nRows = length model.sortedItems
     columnDefsSeq = S.fromList columnDefs
 
     contentPaneContainer =
@@ -345,7 +320,7 @@ contentPane columnDefs model@HagridModel {..} = node
 
     contentGetSizeReq _wenv _node children = (w, h)
       where
-        w = fixedSize (sum (fromIntegral . _mcCurrentWidth <$> _mColumns))
+        w = fixedSize (sum (fromIntegral . currentWidth <$> model.columns))
         h = fixedSize (sum (toRowHeights children columnDefsSeq))
 
     contentResize wenv node viewport children = (resultNode node, assignedAreas)
@@ -353,7 +328,7 @@ contentPane columnDefs model@HagridModel {..} = node
         style = currentStyle wenv node
         Rect l t _w _h = fromMaybe def (removeOuterBounds style viewport)
 
-        colXs = sizesToPositions (S.fromList (fromIntegral . _mcCurrentWidth <$> _mColumns))
+        colXs = sizesToPositions (S.fromList (fromIntegral . currentWidth <$> model.columns))
         rowYs = sizesToPositions (toRowHeights children columnDefsSeq)
 
         assignedAreas = S.fromList $ do
@@ -361,12 +336,12 @@ contentPane columnDefs model@HagridModel {..} = node
           (col, columnDef) <- indexed columnDefs
           pure (assignArea col columnDef row)
 
-        assignArea col ColumnDef {_cdPaddingW, _cdPaddingH} row = Rect chX chY chW chH
+        assignArea col ColumnDef {paddingW, paddingH} row = Rect chX chY chW chH
           where
-            chX = l + S.index colXs col + _cdPaddingW
-            chY = t + S.index rowYs row + _cdPaddingH
-            chW = S.index colXs (col + 1) - S.index colXs col - _cdPaddingW * 2
-            chH = S.index rowYs (row + 1) - S.index rowYs row - _cdPaddingH * 2
+            chX = l + S.index colXs col + paddingW
+            chY = t + S.index rowYs row + paddingH
+            chW = S.index colXs (col + 1) - S.index colXs col - paddingW * 2
+            chH = S.index rowYs (row + 1) - S.index rowYs row - paddingH * 2
 
     contentRender wenv node renderer = do
       forM_ (neighbours rowYs) $ \(y1, y2, even) -> do
@@ -382,7 +357,7 @@ contentPane columnDefs model@HagridModel {..} = node
       forM_ (S.drop 1 rowYs) $ \rowY -> do
         drawLine renderer (Point l (t + rowY)) (Point (l + lastColX) (t + rowY)) 1 (Just lineColor)
       where
-        colXs = sizesToPositions (S.fromList (fromIntegral . _mcCurrentWidth <$> _mColumns))
+        colXs = sizesToPositions (S.fromList (fromIntegral . currentWidth <$> model.columns))
         rowYs = sizesToPositions (toRowHeights (node ^. L.children) columnDefsSeq)
         lastColX
           | _ :|> a <- colXs = a
@@ -410,15 +385,15 @@ initialModel columnDefs items = model
     model =
       sortItems columnDefs $
         HagridModel
-          { _mSortedItems = items,
-            _mColumns = initialColumn <$> columnDefs,
-            _mSortColumn = Nothing,
-            _mSortDirection = SortAscending
+          { sortedItems = items,
+            columns = initialColumn <$> columnDefs,
+            sortColumn = Nothing,
+            sortDirection = SortAscending
           }
-    initialColumn ColumnDef {_cdName, _cdInitialWidth} =
+    initialColumn ColumnDef {name, initialWidth} =
       ModelColumn
-        { _mcName = _cdName,
-          _mcCurrentWidth = _cdInitialWidth
+        { name,
+          currentWidth = initialWidth
         }
 
 headerPaneKey :: Text
@@ -428,12 +403,12 @@ contentPaneKey :: Text
 contentPaneKey = "Hagrid.contentPane"
 
 sortItems :: [ColumnDef ep a] -> HagridModel a -> HagridModel a
-sortItems columnDefs model = case model ^. sortColumn of
+sortItems columnDefs model = case model.sortColumn of
   Just sc
-    | ColumnDef {_cdSortKey = SortWith f} <- columnDefs !! sc ->
-        case model ^. sortDirection of
-          SortAscending -> model & sortedItems %~ List.sortOn f
-          SortDescending -> model & sortedItems %~ List.sortOn (Down . f)
+    | ColumnDef {sortKey = SortWith f} <- columnDefs !! sc ->
+        case model.sortDirection of
+          SortAscending -> model {sortedItems = List.sortOn f model.sortedItems}
+          SortDescending -> model {sortedItems = List.sortOn (Down . f) model.sortedItems}
   _ ->
     model
 
@@ -446,11 +421,11 @@ toRowHeights children columnDefs = mergeHeights <$> S.chunksOf (length columnDef
     mergeHeights rowWidgets =
       foldl' max 0 (S.zipWith widgetHeight columnDefs rowWidgets)
 
-    widgetHeight ColumnDef {_cdPaddingH} widget =
+    widgetHeight ColumnDef {paddingH} widget =
       widget
         & _wnInfo
         & _wniSizeReqH
-        & \r -> _szrFixed r + _szrFlex r + _cdPaddingH * 2
+        & \r -> _szrFixed r + _szrFlex r + paddingH * 2
 
 neighbours :: Seq a -> Seq (a, a, Bool)
 neighbours = \case
@@ -459,22 +434,22 @@ neighbours = \case
   _ -> S.empty
 
 textColumn :: Text -> (a -> Text) -> ColumnDef e a
-textColumn _cdName get = (defaultColumn _cdName _cdWidget) {_cdSortKey}
+textColumn name get = (defaultColumn name widget) {sortKey}
   where
-    _cdWidget item = label_ (get item) [ellipsis]
-    _cdSortKey = SortWith get
+    widget item = label_ (get item) [ellipsis]
+    sortKey = SortWith get
 
 showOrdColumn :: (Show b, Ord b) => Text -> (a -> b) -> ColumnDef e a
-showOrdColumn _cdName get = (defaultColumn _cdName _cdWidget) {_cdSortKey}
+showOrdColumn name get = (defaultColumn name widget) {sortKey}
   where
-    _cdWidget item = label_ ((T.pack . show . get) item) [ellipsis]
-    _cdSortKey = SortWith get
+    widget item = label_ ((T.pack . show . get) item) [ellipsis]
+    sortKey = SortWith get
 
 -- todo: allow widgets that use the model
 widgetColumn :: (Typeable a, Eq a, WidgetEvent e) => Text -> (forall s. a -> WidgetNode s e) -> ColumnDef e a
-widgetColumn _cdName get = defaultColumn _cdName _cdWidget
+widgetColumn name get = defaultColumn name widget
   where
-    _cdWidget item =
+    widget item =
       compositeD_ "Hagrid.Cell" (WidgetValue item) buildUI handleEvent []
     buildUI _wenv model =
       get model
@@ -482,42 +457,18 @@ widgetColumn _cdName get = defaultColumn _cdName _cdWidget
       [Report (ParentEvent e)]
 
 defaultColumn :: Text -> (a -> WidgetNode (HagridModel a) (HagridEvent e)) -> ColumnDef e a
-defaultColumn _cdName _cdWidget =
+defaultColumn name widget =
   ColumnDef
-    { _cdName,
-      _cdWidget,
-      _cdInitialWidth = defaultColumnInitialWidth,
-      _cdSortKey = DontSort,
-      _cdMinWidth = defaultColumnMinWidth,
-      _cdPaddingW = defaultColumnPadding,
-      _cdPaddingH = defaultColumnPadding,
-      _cdResizeHandler = Nothing,
-      _cdSortHandler = Nothing
+    { name,
+      widget,
+      initialWidth = defaultColumnInitialWidth,
+      sortKey = DontSort,
+      minWidth = defaultColumnMinWidth,
+      paddingW = defaultColumnPadding,
+      paddingH = defaultColumnPadding,
+      resizeHandler = Nothing,
+      sortHandler = Nothing
     }
-
-columnInitialWidth :: ColumnDef e a -> Int -> ColumnDef e a
-columnInitialWidth c w = c {_cdInitialWidth = w}
-
-columnMinWidth :: ColumnDef e a -> Int -> ColumnDef e a
-columnMinWidth c w = c {_cdMinWidth = w}
-
-columnSortKey :: ColumnDef e a -> ColumnSortKey a -> ColumnDef e a
-columnSortKey c k = c {_cdSortKey = k}
-
-columnPadding :: ColumnDef e a -> Double -> ColumnDef e a
-columnPadding c p = columnPaddingH (columnPaddingW c p) p
-
-columnPaddingW :: ColumnDef e a -> Double -> ColumnDef e a
-columnPaddingW c p = c {_cdPaddingW = p}
-
-columnPaddingH :: ColumnDef e a -> Double -> ColumnDef e a
-columnPaddingH c p = c {_cdPaddingH = p}
-
-columnResizeHandler :: ColumnDef e a -> (Int -> e) -> ColumnDef e a
-columnResizeHandler c f = c {_cdResizeHandler = Just f}
-
-columnSortHandler :: ColumnDef e a -> (SortDirection -> e) -> ColumnDef e a
-columnSortHandler c f = c {_cdSortHandler = Just f}
 
 defaultColumnInitialWidth :: Int
 defaultColumnInitialWidth = 100

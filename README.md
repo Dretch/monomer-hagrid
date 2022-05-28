@@ -25,5 +25,6 @@ stack run
 ### To format the source code
 
 ```bash
+# This needs at least ormolu 0.5.0.0 to avoid breaking dot-record syntax
 ormolu --mode inplace $(find . -name '*.hs')
 ```

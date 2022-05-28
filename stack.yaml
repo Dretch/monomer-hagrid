@@ -17,7 +17,7 @@
 #
 # resolver: ./custom-snapshot.yaml
 # resolver: https://example.com/snapshots/2018-01-01.yaml
-resolver: lts-18.28
+resolver: nightly-2022-05-28
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -40,10 +40,11 @@ packages:
 # - git: https://github.com/commercialhaskell/stack.git
 #   commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a
 extra-deps:
-- extra-1.7.10
-- nanovg-0.8.0.0
-- git: "https://github.com/fjvallarino/monomer"
-  commit: "55ae7f88f1da80064fa3dc6ce6cfb4fce47e8e5a"
+- git: "https://github.com/Dretch/monomer"
+  commit: "e2870908a5a632209056f1de338b112676a643b4"
+  # needed to get https://github.com/haskell-game/sdl2/pull/264
+- git: "https://github.com/haskell-game/sdl2"
+  commit: b4fe21c1025e4be9a1eb03c19f811e1776a2b292
 
 # Override default flag values for local packages and extra-deps
 flags:
