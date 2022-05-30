@@ -87,7 +87,7 @@ merging = describe "merging" $ do
     columnWidths startNode `shouldBe` [75]
     columnWidths resizedNode `shouldBe` [75]
 
-testColumn :: Text -> (TestItem -> SizeReq) -> ColumnDef TestEvent TestItem
+testColumn :: Text -> (TestItem -> SizeReq) -> Column TestEvent TestItem
 testColumn name getHeight =
   (widgetColumn name (testCellWidget getHeight)) {paddingW = 0, paddingH = 0}
 
@@ -100,11 +100,11 @@ testCellWidget getHeight item = wgt
     reqW = fixedSize 10
     reqH = getHeight item
 
-cellViewports :: [ColumnDef TestEvent TestItem] -> [TestItem] -> [Rect]
+cellViewports :: [Column TestEvent TestItem] -> [TestItem] -> [Rect]
 cellViewports columnDefs items =
   cellViewports_ columnDefs items []
 
-cellViewports_ :: [ColumnDef TestEvent TestItem] -> [TestItem] -> [SystemEvent] -> [Rect]
+cellViewports_ :: [Column TestEvent TestItem] -> [TestItem] -> [SystemEvent] -> [Rect]
 cellViewports_ columnDefs items evts = Foldable.toList childVps
   where
     node = nodeInit wenv (hagrid columnDefs items)

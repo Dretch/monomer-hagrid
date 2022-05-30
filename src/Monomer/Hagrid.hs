@@ -7,7 +7,7 @@
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
 module Monomer.Hagrid
-  ( ColumnDef (..),
+  ( Column (..),
     ColumnSortKey (..),
     SortDirection (..),
     hagrid,
@@ -44,7 +44,7 @@ data HagridEvent ep
   | ResizeColumnFinished Int
   | ParentEvent ep
 
-data ColumnDef e a = ColumnDef
+data Column e a = Column
   { name :: Text,
     widget :: a -> WidgetNode (HagridModel a) (HagridEvent e),
     sortKey :: ColumnSortKey a,
@@ -86,7 +86,7 @@ data HeaderDragHandleState = HeaderDragHandleState
   deriving (Eq, Show)
 
 -- todo: accept lens ?
-hagrid :: forall a s e. (CompositeModel a, WidgetModel s, WidgetEvent e) => [ColumnDef e a] -> [a] -> WidgetNode s e
+hagrid :: forall a s e. (CompositeModel a, WidgetModel s, WidgetEvent e) => [Column e a] -> [a] -> WidgetNode s e
 hagrid columnDefs items = widget
   where
     widget =
@@ -111,7 +111,7 @@ hagrid columnDefs items = widget
     handleEvent wenv _node model = \case
       OrderByColumn colIndex -> result
         where
-          ColumnDef {sortHandler} = columnDefs !! colIndex
+          Column {sortHandler} = columnDefs !! colIndex
           newModel
             | Just c <- model.sortColumn,
               c == colIndex =
@@ -130,7 +130,7 @@ hagrid columnDefs items = widget
       ResizeColumnFinished colIndex -> result
         where
           ModelColumn {currentWidth} = model.columns !! colIndex
-          ColumnDef {resizeHandler} = columnDefs !! colIndex
+          Column {resizeHandler} = columnDefs !! colIndex
           result =
             Report <$> maybeToList (resizeHandler <*> Just currentWidth)
       ParentEvent e ->
@@ -171,7 +171,7 @@ accentColor wenv = transColor
     color = fromMaybe (rgb 255 255 255) (_sstText style >>= _txsFontColor)
     transColor = color {_colorA = 0.7}
 
-headerPane :: WidgetEvent ep => [ColumnDef ep a] -> HagridModel a -> WidgetNode s (HagridEvent ep)
+headerPane :: WidgetEvent ep => [Column ep a] -> HagridModel a -> WidgetNode s (HagridEvent ep)
 headerPane columnDefs model = node
   where
     node =
@@ -231,12 +231,12 @@ headerPane columnDefs model = node
         indL = l + colOffset - indW - pad
         indRect = Rect indL indT indW indW
 
-headerButton :: WidgetEvent ep => Int -> ColumnDef ep a -> WidgetNode s (HagridEvent ep)
+headerButton :: WidgetEvent ep => Int -> Column ep a -> WidgetNode s (HagridEvent ep)
 headerButton colIndex columnDef =
   button_ columnDef.name (OrderByColumn colIndex) [ellipsis]
     `styleBasic` [radius 0]
 
-headerDragHandle :: WidgetEvent ep => Int -> ColumnDef ep a -> ModelColumn -> WidgetNode s (HagridEvent ep)
+headerDragHandle :: WidgetEvent ep => Int -> Column ep a -> ModelColumn -> WidgetNode s (HagridEvent ep)
 headerDragHandle colIndex columnDef column = tree
   where
     tree = defaultWidgetNode "Hagrid.HeaderDragHandle" (headerDragHandleWidget Nothing)
@@ -295,7 +295,7 @@ headerDragHandle colIndex columnDef column = tree
           where
             vp = node ^. L.info . L.viewport
 
-contentPane :: Typeable a => [ColumnDef ep a] -> HagridModel a -> WidgetNode (HagridModel a) (HagridEvent ep)
+contentPane :: Typeable a => [Column ep a] -> HagridModel a -> WidgetNode (HagridModel a) (HagridEvent ep)
 contentPane columnDefs model = node
   where
     node =
@@ -303,7 +303,7 @@ contentPane columnDefs model = node
         & L.children .~ S.fromList (mconcat childWidgetRows)
 
     childWidgetRows =
-      [[widget item | ColumnDef {widget} <- columnDefs] | item <- model.sortedItems]
+      [[widget item | Column {widget} <- columnDefs] | item <- model.sortedItems]
 
     nRows = length model.sortedItems
     columnDefsSeq = S.fromList columnDefs
@@ -336,7 +336,7 @@ contentPane columnDefs model = node
           (col, columnDef) <- indexed columnDefs
           pure (assignArea col columnDef row)
 
-        assignArea col ColumnDef {paddingW, paddingH} row = Rect chX chY chW chH
+        assignArea col Column {paddingW, paddingH} row = Rect chX chY chW chH
           where
             chX = l + S.index colXs col + paddingW
             chY = t + S.index rowYs row + paddingH
@@ -379,7 +379,7 @@ contentPane columnDefs model = node
         Just (resultReqs node [RenderOnce])
       _ -> Nothing
 
-initialModel :: [ColumnDef ep a] -> [a] -> HagridModel a
+initialModel :: [Column ep a] -> [a] -> HagridModel a
 initialModel columnDefs items = model
   where
     model =
@@ -390,7 +390,7 @@ initialModel columnDefs items = model
             sortColumn = Nothing,
             sortDirection = SortAscending
           }
-    initialColumn ColumnDef {name, initialWidth} =
+    initialColumn Column {name, initialWidth} =
       ModelColumn
         { name,
           currentWidth = initialWidth
@@ -402,10 +402,10 @@ headerPaneKey = "Hagrid.headerPane"
 contentPaneKey :: Text
 contentPaneKey = "Hagrid.contentPane"
 
-sortItems :: [ColumnDef ep a] -> HagridModel a -> HagridModel a
+sortItems :: [Column ep a] -> HagridModel a -> HagridModel a
 sortItems columnDefs model = case model.sortColumn of
   Just sc
-    | ColumnDef {sortKey = SortWith f} <- columnDefs !! sc ->
+    | Column {sortKey = SortWith f} <- columnDefs !! sc ->
         case model.sortDirection of
           SortAscending -> model {sortedItems = List.sortOn f model.sortedItems}
           SortDescending -> model {sortedItems = List.sortOn (Down . f) model.sortedItems}
@@ -415,13 +415,13 @@ sortItems columnDefs model = case model.sortColumn of
 sizesToPositions :: Seq Double -> Seq Double
 sizesToPositions = S.scanl (+) 0
 
-toRowHeights :: Seq (WidgetNode s e1) -> Seq (ColumnDef e2 a) -> Seq Double
+toRowHeights :: Seq (WidgetNode s e1) -> Seq (Column e2 a) -> Seq Double
 toRowHeights children columnDefs = mergeHeights <$> S.chunksOf (length columnDefs) children
   where
     mergeHeights rowWidgets =
       foldl' max 0 (S.zipWith widgetHeight columnDefs rowWidgets)
 
-    widgetHeight ColumnDef {paddingH} widget =
+    widgetHeight Column {paddingH} widget =
       widget
         & _wnInfo
         & _wniSizeReqH
@@ -433,20 +433,20 @@ neighbours = \case
   a :<| b :<| S.Empty -> S.singleton (a, b, False)
   _ -> S.empty
 
-textColumn :: Text -> (a -> Text) -> ColumnDef e a
+textColumn :: Text -> (a -> Text) -> Column e a
 textColumn name get = (defaultColumn name widget) {sortKey}
   where
     widget item = label_ (get item) [ellipsis]
     sortKey = SortWith get
 
-showOrdColumn :: (Show b, Ord b) => Text -> (a -> b) -> ColumnDef e a
+showOrdColumn :: (Show b, Ord b) => Text -> (a -> b) -> Column e a
 showOrdColumn name get = (defaultColumn name widget) {sortKey}
   where
     widget item = label_ ((T.pack . show . get) item) [ellipsis]
     sortKey = SortWith get
 
 -- todo: allow widgets that use the model
-widgetColumn :: (Typeable a, Eq a, WidgetEvent e) => Text -> (forall s. a -> WidgetNode s e) -> ColumnDef e a
+widgetColumn :: (Typeable a, Eq a, WidgetEvent e) => Text -> (forall s. a -> WidgetNode s e) -> Column e a
 widgetColumn name get = defaultColumn name widget
   where
     widget item =
@@ -456,9 +456,9 @@ widgetColumn name get = defaultColumn name widget
     handleEvent _wenv _node _model e =
       [Report (ParentEvent e)]
 
-defaultColumn :: Text -> (a -> WidgetNode (HagridModel a) (HagridEvent e)) -> ColumnDef e a
+defaultColumn :: Text -> (a -> WidgetNode (HagridModel a) (HagridEvent e)) -> Column e a
 defaultColumn name widget =
-  ColumnDef
+  Column
     { name,
       widget,
       initialWidth = defaultColumnInitialWidth,

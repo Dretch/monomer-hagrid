@@ -11,7 +11,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time (Day, addDays, defaultTimeLocale, formatTime, fromGregorian)
 import Monomer
-import Monomer.Hagrid (ColumnDef (..), ColumnSortKey (SortWith), SortDirection, hagrid, showOrdColumn, textColumn, widgetColumn)
+import Monomer.Hagrid (Column (..), ColumnSortKey (SortWith), SortDirection, hagrid, showOrdColumn, textColumn, widgetColumn)
 import Text.Printf (printf)
 
 data AppModel = AppModel
@@ -98,7 +98,7 @@ buildUI _wenv model = tree
     columnConfigurers =
       zipWith columnConfigurer [0 .. length model.columns - 1] gridColumns
 
-    columnConfigurer :: Int -> ColumnDef AppEvent Spider -> WidgetNode AppModel AppEvent
+    columnConfigurer :: Int -> Column AppEvent Spider -> WidgetNode AppModel AppEvent
     columnConfigurer idx columnDef =
       labeledCheckbox_
         columnDef.name
@@ -114,7 +114,7 @@ handleEvent _wenv _node _model = \case
   NameColumnSorted direction ->
     [Producer (const (putStrLn ("Name column was sorted: " <> show direction)))]
 
-gridColumns :: [ColumnDef AppEvent Spider]
+gridColumns :: [Column AppEvent Spider]
 gridColumns = cols
   where
     cols =
