@@ -8,6 +8,7 @@
 
 module Monomer.Hagrid
   ( Column (..),
+    ColumnWidget (..),
     ColumnSortKey (..),
     SortDirection (..),
     hagrid,
@@ -32,7 +33,6 @@ import Data.Sequence (Seq ((:<|), (:|>)))
 import qualified Data.Sequence as S
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Typeable (Typeable)
 import Monomer
 import qualified Monomer.Lens as L
 import Monomer.Widgets.Container
@@ -46,7 +46,7 @@ data HagridEvent ep
 
 data Column e a = Column
   { name :: Text,
-    widget :: a -> WidgetNode (HagridModel a) (HagridEvent e),
+    widget :: ColumnWidget e a,
     sortKey :: ColumnSortKey a,
     initialWidth :: Int,
     minWidth :: Int,
@@ -55,6 +55,10 @@ data Column e a = Column
     resizeHandler :: Maybe (Int -> e),
     sortHandler :: Maybe (SortDirection -> e)
   }
+
+data ColumnWidget e a where
+  LabelWidget :: (a -> Text) -> ColumnWidget e a
+  CustomWidget :: (forall s. a -> WidgetNode s e) -> ColumnWidget e a
 
 data ColumnSortKey a where
   DontSort :: ColumnSortKey a
@@ -295,7 +299,7 @@ headerDragHandle colIndex columnDef column = tree
           where
             vp = node ^. L.info . L.viewport
 
-contentPane :: Typeable a => [Column ep a] -> HagridModel a -> WidgetNode (HagridModel a) (HagridEvent ep)
+contentPane :: (CompositeModel a, WidgetEvent ep) => [Column ep a] -> HagridModel a -> WidgetNode (HagridModel a) (HagridEvent ep)
 contentPane columnDefs model = node
   where
     node =
@@ -303,7 +307,7 @@ contentPane columnDefs model = node
         & L.children .~ S.fromList (mconcat childWidgetRows)
 
     childWidgetRows =
-      [[widget item | Column {widget} <- columnDefs] | item <- model.sortedItems]
+      [[cellWidget item widget | Column {widget} <- columnDefs] | item <- model.sortedItems]
 
     nRows = length model.sortedItems
     columnDefsSeq = S.fromList columnDefs
@@ -436,27 +440,20 @@ neighbours = \case
 textColumn :: Text -> (a -> Text) -> Column e a
 textColumn name get = (defaultColumn name widget) {sortKey}
   where
-    widget item = label_ (get item) [ellipsis]
+    widget = LabelWidget get
     sortKey = SortWith get
 
 showOrdColumn :: (Show b, Ord b) => Text -> (a -> b) -> Column e a
 showOrdColumn name get = (defaultColumn name widget) {sortKey}
   where
-    widget item = label_ ((T.pack . show . get) item) [ellipsis]
+    widget = LabelWidget (T.pack . show . get)
     sortKey = SortWith get
 
 -- todo: allow widgets that use the model
-widgetColumn :: (Typeable a, Eq a, WidgetEvent e) => Text -> (forall s. a -> WidgetNode s e) -> Column e a
-widgetColumn name get = defaultColumn name widget
-  where
-    widget item =
-      compositeD_ "Hagrid.Cell" (WidgetValue item) buildUI handleEvent []
-    buildUI _wenv model =
-      get model
-    handleEvent _wenv _node _model e =
-      [Report (ParentEvent e)]
+widgetColumn :: Text -> (forall s. a -> WidgetNode s e) -> Column e a
+widgetColumn name get = defaultColumn name (CustomWidget get)
 
-defaultColumn :: Text -> (a -> WidgetNode (HagridModel a) (HagridEvent e)) -> Column e a
+defaultColumn :: Text -> ColumnWidget e a -> Column e a
 defaultColumn name widget =
   Column
     { name,
@@ -469,6 +466,18 @@ defaultColumn name widget =
       resizeHandler = Nothing,
       sortHandler = Nothing
     }
+
+cellWidget :: (CompositeModel a, WidgetEvent e, WidgetModel s) => a -> ColumnWidget e a -> WidgetNode (HagridModel s) (HagridEvent e)
+cellWidget item = \case
+  LabelWidget get -> label_ (get item) [ellipsis]
+  CustomWidget get -> widget
+    where
+      widget =
+        compositeD_ "Hagrid.Cell" (WidgetValue item) buildUI handleEvent []
+      buildUI _wenv model =
+        get model
+      handleEvent _wenv _node _model e =
+        [Report (ParentEvent e)]
 
 defaultColumnInitialWidth :: Int
 defaultColumnInitialWidth = 100
