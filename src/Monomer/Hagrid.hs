@@ -6,12 +6,19 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
+-- |
+-- A datagrid widget for the Monomer UI library.
 module Monomer.Hagrid
-  ( Column (..),
+  ( -- * Types
+    Column (..),
     ColumnWidget (..),
     ColumnSortKey (..),
     SortDirection (..),
+
+    -- * Hagrid constructor
     hagrid,
+
+    -- * Column constructors
     textColumn,
     showOrdColumn,
     widgetColumn,
@@ -44,26 +51,44 @@ data HagridEvent ep
   | ResizeColumnFinished Int
   | ParentEvent ep
 
+-- | A column definition.
 data Column e a = Column
-  { name :: Text,
+  { -- | The name of the column, displayed in the column header.
+    name :: Text,
+    -- | Creates the widget for each cell in the column.
     widget :: ColumnWidget e a,
+    -- | Determines if and how the column can be sorted by clicking the column header.
     sortKey :: ColumnSortKey a,
+    -- | The initial width of the column, in pixels. The user can then change the
+    -- width by dragging the edge of the column header.
     initialWidth :: Int,
+    -- | The minimum allowed width of the column, in pixels.
     minWidth :: Int,
+    -- | The padding to the left and right of the widget in each cell of the column, in pixels.
     paddingW :: Double,
+    -- | The padding above and below the widget in each cell in the column, in pixels.
     paddingH :: Double,
+    -- | An optional event to emit when a user has finished resizing the column. The function receives the new width in pixels.
     resizeHandler :: Maybe (Int -> e),
+    -- | An optional event to emit when a user has sorted the column by clicking the header. The function receives the new sort direction.
     sortHandler :: Maybe (SortDirection -> e)
   }
 
+-- | How to create the widget that displays each cell in a column.
 data ColumnWidget e a where
+  -- | Create a label widget.
   LabelWidget :: (a -> Text) -> ColumnWidget e a
+  -- | Create a widget of arbitrary type.
   CustomWidget :: (forall s. a -> WidgetNode s e) -> ColumnWidget e a
 
+-- | Whether a column can be sorted by the user clicking the column header, and if so, how.
 data ColumnSortKey a where
+  -- | Means that a column can't be sorted.
   DontSort :: ColumnSortKey a
+  -- | Means that a column can be sorted, using the specified sort key function.
   SortWith :: Ord b => (a -> b) -> ColumnSortKey a
 
+-- | Whether a column is being sorted in ascending or descending order.
 data SortDirection
   = SortAscending
   | SortDescending
@@ -89,10 +114,19 @@ data HeaderDragHandleState = HeaderDragHandleState
   }
   deriving (Eq, Show)
 
--- todo: accept lens ?
-hagrid :: forall a s e. (CompositeModel a, WidgetModel s, WidgetEvent e) => [Column e a] -> [a] -> WidgetNode s e
+-- | Creates a hagrid widget.
+hagrid ::
+  forall a s e.
+  (CompositeModel a, WidgetModel s, WidgetEvent e) =>
+  -- | The definitions for each column in the grid.
+  [Column e a] ->
+  -- | The items for each row in the grid.
+  [a] ->
+  WidgetNode s e
 hagrid columnDefs items = widget
   where
+    -- todo: accept lens ?
+
     widget =
       compositeD_
         "Hagrid.Root"
@@ -437,20 +471,38 @@ neighbours = \case
   a :<| b :<| S.Empty -> S.singleton (a, b, False)
   _ -> S.empty
 
-textColumn :: Text -> (a -> Text) -> Column e a
+-- | Creates a column that displays a text value, and is sortable by the text.
+textColumn ::
+  -- | Name of the column, to display in the header.
+  Text ->
+  -- | Called with the item for each row to get the text to display for that row.
+  (a -> Text) ->
+  Column e a
 textColumn name get = (defaultColumn name widget) {sortKey}
   where
     widget = LabelWidget get
     sortKey = SortWith get
 
-showOrdColumn :: (Show b, Ord b) => Text -> (a -> b) -> Column e a
+-- | Creates a column that displays the result of calling @'show'@ on a value, and is sortable by the value.
+showOrdColumn ::
+  (Show b, Ord b) =>
+  -- | Name of the column, to display in the header.
+  Text ->
+  -- | Called with the item for each row to get the value to display (via @'show'@) and sort by.
+  (a -> b) ->
+  Column e a
 showOrdColumn name get = (defaultColumn name widget) {sortKey}
   where
     widget = LabelWidget (T.pack . show . get)
     sortKey = SortWith get
 
--- todo: allow widgets that use the model
-widgetColumn :: Text -> (forall s. a -> WidgetNode s e) -> Column e a
+-- | Creates a column that displays the a custom widget in each cell.
+widgetColumn ::
+  -- | Name of the column, to display in the header.
+  Text ->
+  -- | Called with the item for each row to get the widget to display for that row.
+  (forall s. a -> WidgetNode s e) ->
+  Column e a
 widgetColumn name get = defaultColumn name (CustomWidget get)
 
 defaultColumn :: Text -> ColumnWidget e a -> Column e a
