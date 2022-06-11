@@ -2,12 +2,12 @@ module Monomer.HagridSpec (spec) where
 
 import Control.Lens ((&), (.~), (^.))
 import qualified Data.Foldable as Foldable
-import Data.Text (Text)
+import Data.Text (Text, pack)
 import Monomer
 import Monomer.Hagrid
 import qualified Monomer.Lens as L
 import Monomer.TestUtil
-import Test.Hspec (Spec, describe, it, pendingWith, shouldBe)
+import Test.Hspec (Spec, describe, it, shouldBe)
 
 data TestModel = TestModel
   deriving (Eq, Show)
@@ -62,20 +62,43 @@ sorting :: Spec
 sorting = describe "sorting" $ do
   it "should not sort rows by default" $ do
     cellViewports
-      [(testColumn "Col 1" sizeReq) {initialWidth = 50}]
-      [TestItem (fixedSize 20), TestItem (fixedSize 10), TestItem (fixedSize 30)]
-      `shouldBe` [Rect 0 40 50 20, Rect 0 60 50 10, Rect 0 70 50 30]
+      [(testColumn "Col 1" sizeReq) {initialWidth = 50, sortKey = SortWith (_szrFixed . sizeReq)}]
+      [ TestItem (fixedSize 20),
+        TestItem (fixedSize 10),
+        TestItem (fixedSize 30)
+      ]
+      `shouldBe` [ Rect 0 40 50 20,
+                   Rect 0 60 50 10,
+                   Rect 0 70 50 30
+                 ]
 
-  it "should sort by ascending when column header clicked" $ do
-    pendingWith "not sure how to make this test work yet"
+  it "should sort in ascending order when column header clicked" $ do
     cellViewports_
-      [(testColumn "Col 1" sizeReq) {initialWidth = 50}]
-      [TestItem (fixedSize 20), TestItem (fixedSize 10), TestItem (fixedSize 30)]
+      [(testColumn "Col 1" sizeReq) {initialWidth = 50, sortKey = SortWith (_szrFixed . sizeReq)}]
+      [ TestItem (fixedSize 20),
+        TestItem (fixedSize 10),
+        TestItem (fixedSize 30)
+      ]
       [Click (Point 10 10) BtnLeft 1]
-      `shouldBe` [Rect 0 40 50 10, Rect 0 50 50 20, Rect 0 70 50 30]
+      `shouldBe` [ Rect 0 40 50 10,
+                   Rect 0 50 50 20,
+                   Rect 0 70 50 30
+                 ]
 
-  it "should sort by descending when column header clicked again" $ do
-    pendingWith "not sure how to make this test work yet"
+  it "should sort in descending order when column header clicked again" $ do
+    cellViewports_
+      [(testColumn "Col 1" sizeReq) {initialWidth = 50, sortKey = SortWith (_szrFixed . sizeReq)}]
+      [ TestItem (fixedSize 20),
+        TestItem (fixedSize 10),
+        TestItem (fixedSize 30)
+      ]
+      [ Click (Point 10 10) BtnLeft 1,
+        Click (Point 10 10) BtnLeft 1
+      ]
+      `shouldBe` [ Rect 0 40 50 30,
+                   Rect 0 70 50 20,
+                   Rect 0 90 50 10
+                 ]
 
 merging :: Spec
 merging = describe "merging" $ do
@@ -96,7 +119,9 @@ testColumn name getHeight =
 testCellWidget :: (TestItem -> SizeReq) -> TestItem -> WidgetNode s TestEvent
 testCellWidget getHeight item = wgt
   where
-    wgt = label "test" `styleBasic` [sizeReqW reqW, sizeReqH reqH]
+    -- we need to change the text rather than just the size here, due to
+    -- https://github.com/fjvallarino/monomer/issues/168
+    wgt = label ("test " <> pack (show reqH)) `styleBasic` [sizeReqW reqW, sizeReqH reqH]
     reqW = fixedSize 10
     reqH = getHeight item
 
@@ -107,10 +132,11 @@ cellViewports columnDefs items =
 cellViewports_ :: [Column TestEvent TestItem] -> [TestItem] -> [SystemEvent] -> [Rect]
 cellViewports_ columnDefs items evts = Foldable.toList childVps
   where
-    node = nodeInit wenv (hagrid columnDefs items)
-    node' = nodeHandleEventRoot wenv evts node
-    node'' = widgetGetInstanceTree (node ^. L.widget) wenv node'
-    childVps = roundRectUnits . _wniViewport . _winInfo <$> widgetsOfType "Hagrid.Cell" node''
+    startNode = nodeInit wenv (hagrid columnDefs items)
+    ((wenv', eventedNode, _reqs), _) = nodeHandleEvents wenv WNoInit evts startNode
+    resizedNode = nodeResize wenv' eventedNode (eventedNode ^. L.info . L.viewport)
+    instanceTree = widgetGetInstanceTree (resizedNode ^. L.widget) wenv' resizedNode
+    childVps = roundRectUnits . _wniViewport . _winInfo <$> widgetsOfType "Hagrid.Cell" instanceTree
 
 -- Extract the column widths by observing the locations of the special drag handle widgets
 columnWidths :: WidgetNode TestModel TestEvent -> [Int]
