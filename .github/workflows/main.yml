@@ -1,0 +1,40 @@
+name: CI
+
+on: [push]
+
+jobs:
+  check-formatting:
+
+    runs-on: ubuntu-22.04
+
+    steps:
+
+    - uses: actions/checkout@v3
+      
+    - uses: mrkkrp/ormolu-action@v6
+
+  build:
+
+    runs-on: ubuntu-22.04
+
+    steps:
+
+    - run: sudo apt-get update && sudo apt-get install --assume-yes libsdl2-dev libglew-dev
+
+    - uses: actions/checkout@v3
+
+    - uses: actions/cache@v3
+      with:
+        key: stack
+        path: ~/.stack
+    
+    - uses: actions/cache@v3
+      with:
+        key: stack-work
+        path: .stack-work
+  
+    - uses: haskell/actions/setup@v2
+      with:
+        stack-setup-ghc: true
+        enable-stack: true
+    - run: stack test
