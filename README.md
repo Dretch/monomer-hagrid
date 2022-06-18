@@ -2,8 +2,17 @@
 
 A datagrid widget for the [Monomer](https://github.com/fjvallarino/monomer) library.
 
+![Example hagrid widget screenshot](readme/example.png)
+
 ## Current Status
-- Buggy and incomplete. Just a toy.
+- Somewhat buggy and incomplete. Just a toy.
+
+## Features
+- Vertical and horizontal scrolling.
+- Resizable columns.
+- Column sorting, with a customizable sort key.
+- Custom widgets for each cell, to override the standard label.
+- Custom width/height padding for each cell, configured per column.
 
 ## Goals
 - Have complete and helpful documentation.
