@@ -6,8 +6,7 @@
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
--- |
--- A datagrid widget for the Monomer UI library.
+-- | A datagrid widget for the Monomer UI library.
 module Monomer.Hagrid
   ( -- * Types
     Column (..),
@@ -40,13 +39,15 @@ import Data.Sequence (Seq ((:<|), (:|>)))
 import qualified Data.Sequence as S
 import Data.Text (Text)
 import qualified Data.Text as T
+import Data.Typeable (cast)
 import Monomer
 import qualified Monomer.Lens as L
 import Monomer.Widgets.Container
 import Monomer.Widgets.Single
 
 data HagridEvent ep
-  = OrderByColumn Int
+  = ContentScrollChange ScrollStatus
+  | OrderByColumn Int
   | ResizeColumn Int Int
   | ResizeColumnFinished Int
   | ParentEvent ep
@@ -108,6 +109,13 @@ data ModelColumn = ModelColumn
   }
   deriving (Eq, Show)
 
+data HeaderPaneState = HeaderPaneState
+  { offsetX :: Double
+  }
+  deriving (Eq, Show)
+
+data HeaderPaneEvent = ScrollHeaderPaneTo Double
+
 data HeaderDragHandleState = HeaderDragHandleState
   { dragStartMouseX :: Double,
     dragStartColumnW :: Int
@@ -139,14 +147,17 @@ hagrid columnDefs items = widget
     buildUI _wenv model = tree
       where
         tree =
-          hscroll $
-            vstack
-              [ headerPane columnDefs model `nodeKey` headerPaneKey,
-                vscroll (contentPane columnDefs model `nodeKey` contentPaneKey)
-              ]
+          vstack
+            [ headerPane columnDefs model `nodeKey` headerPaneKey,
+              scroll_ [onChange ContentScrollChange] $
+                contentPane columnDefs model `nodeKey` contentPaneKey
+            ]
 
     handleEvent :: EventHandler (HagridModel a) (HagridEvent e) sp e
     handleEvent wenv _node model = \case
+      ContentScrollChange ScrollStatus {scrollDeltaX} ->
+        [ Message (WidgetKey headerPaneKey) (ScrollHeaderPaneTo scrollDeltaX)
+        ]
       OrderByColumn colIndex -> result
         where
           Column {sortHandler} = columnDefs !! colIndex
@@ -209,65 +220,97 @@ accentColor wenv = transColor
     color = fromMaybe (rgb 255 255 255) (_sstText style >>= _txsFontColor)
     transColor = color {_colorA = 0.7}
 
-headerPane :: WidgetEvent ep => [Column ep a] -> HagridModel a -> WidgetNode s (HagridEvent ep)
-headerPane columnDefs model = node
+headerPane :: forall s ep a. WidgetEvent ep => [Column ep a] -> HagridModel a -> WidgetNode s (HagridEvent ep)
+headerPane columnDefs model = makeNode (HeaderPaneState 0)
   where
-    node =
-      defaultWidgetNode "Hagrid.HeaderPane" headerPaneContainer
-        & L.children .~ S.fromList headerWidgets
-
-    dragHandleWidth = 4
-    dragHandleHeight = 40
-
-    headerWidgets =
-      mconcat (izipWith headerWidgetPair columnDefs model.columns)
-
-    headerWidgetPair i columnDef column = [btn, handle]
+    makeNode :: HeaderPaneState -> WidgetNode s (HagridEvent ep)
+    makeNode state = node
       where
-        btn = headerButton i columnDef
-        handle = headerDragHandle i columnDef column
+        node =
+          defaultWidgetNode "Hagrid.HeaderPane" (makeWidget state)
+            & L.children .~ S.fromList childWidgets
 
-    headerPaneContainer =
-      createContainer
-        model.columns
-        def
-          { containerGetSizeReq = headerGetSizeReq,
-            containerResize = headerResize,
-            containerRenderAfter = headerRenderAfter
-          }
+        childWidgets =
+          mconcat (izipWith childWidgetPair columnDefs model.columns)
 
-    headerGetSizeReq _wenv _node _children = (w, h)
+        childWidgetPair i columnDef column = [btn, handle]
+          where
+            btn = headerButton i columnDef
+            handle = headerDragHandle i columnDef column
+
+    makeWidget :: HeaderPaneState -> Widget s (HagridEvent ep)
+    makeWidget state = container
       where
-        w = fixedSize (sum (fromIntegral . currentWidth <$> model.columns))
-        h = fixedSize dragHandleHeight
+        container =
+          createContainer
+            state
+            def
+              { containerChildrenOffset = Just (Point state.offsetX 0),
+                containerUpdateCWenv = updateCWenv,
+                containerMerge = merge,
+                containerHandleMessage = handleMessage,
+                containerGetSizeReq = getSizeReq,
+                containerResize = resize,
+                containerRenderAfter = renderAfter
+              }
 
-    headerResize _wenv node viewport _children = (resultNode node, assignedAreas)
-      where
-        Rect l t _w h = viewport
-        widgetWidths = do
-          w <- currentWidth <$> model.columns
-          [w - dragHandleWidth, dragHandleWidth]
-        (assignedAreas, _) = foldl' assignArea (mempty, l) widgetWidths
-        assignArea (areas, colX) columnWidth =
-          (areas S.:|> Rect colX t (fromIntegral columnWidth) h, colX + fromIntegral columnWidth)
+        -- needed to ensure child widgets don't disappear when scrolling
+        updateCWenv wenv node _cnode _cidx = newWenv
+          where
+            style = currentStyle wenv node
+            carea = getContentArea node style
+            newWenv =
+              wenv
+                & L.viewport .~ moveRect (Point (-state.offsetX) 0) carea
 
-    headerRenderAfter wenv node renderer =
-      forM_ model.sortColumn (renderSortIndicator wenv node renderer)
+        -- keep the scroll offset from the old node
+        merge _wenv node _oldNode oldState = resultNode newNode
+          where
+            newNode = node & L.widget .~ makeWidget oldState
 
-    renderSortIndicator wenv node renderer sortCol = do
-      drawSortIndicator renderer indRect (Just (accentColor wenv)) model.sortDirection
-      where
-        style = wenv ^. L.theme . L.basic . L.btnStyle
-        Rect l t _w h = node ^. L.info . L.viewport
-        size = style ^. L.text . non def . L.fontSize . non def
-        colOffset = fromIntegral (sum (take (sortCol + 1) (currentWidth <$> model.columns)) - dragHandleWidth)
-        indW = unFontSize size * 2 / 3
-        pad = indW / 3
-        indT = case model.sortDirection of
-          SortAscending -> h - pad - indW
-          SortDescending -> t + pad
-        indL = l + colOffset - indW - pad
-        indRect = Rect indL indT indW indW
+        handleMessage :: ContainerMessageHandler s (HagridEvent ep)
+        handleMessage _wenv node _target msg = result
+          where
+            handleTypedMessage (ScrollHeaderPaneTo offsetX)
+              | offsetX == state.offsetX = Nothing
+              | otherwise =
+                  Just $
+                    resultNode $
+                      node & L.widget .~ makeWidget state {offsetX}
+            result = cast msg >>= handleTypedMessage
+
+        getSizeReq _wenv _node _children = (w, h)
+          where
+            w = fixedSize (sum (fromIntegral . currentWidth <$> model.columns) + 100)
+            h = fixedSize dragHandleHeight
+
+        resize _wenv node viewport _children = (resultNode node, assignedAreas)
+          where
+            Rect l t _w h = viewport
+            widgetWidths = do
+              w <- currentWidth <$> model.columns
+              [w - dragHandleWidth, dragHandleWidth]
+            (assignedAreas, _) = foldl' assignArea (mempty, l) widgetWidths
+            assignArea (areas, colX) columnWidth =
+              (areas S.:|> Rect colX t (fromIntegral columnWidth) h, colX + fromIntegral columnWidth)
+
+        renderAfter wenv node renderer =
+          forM_ model.sortColumn (renderSortIndicator wenv node renderer)
+
+        renderSortIndicator wenv node renderer sortCol = do
+          drawSortIndicator renderer indRect (Just (accentColor wenv)) model.sortDirection
+          where
+            style = wenv ^. L.theme . L.basic . L.btnStyle
+            Rect l t _w h = node ^. L.info . L.viewport
+            size = style ^. L.text . non def . L.fontSize . non def
+            colOffset = fromIntegral (sum (take (sortCol + 1) (currentWidth <$> model.columns)) - dragHandleWidth)
+            indW = unFontSize size * 2 / 3
+            pad = indW / 3
+            indT = case model.sortDirection of
+              SortAscending -> h - pad - indW
+              SortDescending -> t + pad
+            indL = l + state.offsetX + colOffset - indW - pad
+            indRect = Rect indL indT indW indW
 
 headerButton :: WidgetEvent ep => Int -> Column ep a -> WidgetNode s (HagridEvent ep)
 headerButton colIndex columnDef =
@@ -350,18 +393,18 @@ contentPane columnDefs model = node
       createContainer
         model
         def
-          { containerGetSizeReq = contentGetSizeReq,
-            containerResize = contentResize,
-            containerRender = contentRender,
-            containerHandleEvent = contentHandleEvent
+          { containerGetSizeReq = getSizeReq,
+            containerResize = resize,
+            containerRender = render,
+            containerHandleEvent = handleEvent
           }
 
-    contentGetSizeReq _wenv _node children = (w, h)
+    getSizeReq _wenv _node children = (w, h)
       where
         w = fixedSize (sum (fromIntegral . currentWidth <$> model.columns))
         h = fixedSize (sum (toRowHeights children columnDefsSeq))
 
-    contentResize wenv node viewport children = (resultNode node, assignedAreas)
+    resize wenv node viewport children = (resultNode node, assignedAreas)
       where
         style = currentStyle wenv node
         Rect l t _w _h = fromMaybe def (removeOuterBounds style viewport)
@@ -381,7 +424,7 @@ contentPane columnDefs model = node
             chW = S.index colXs (col + 1) - S.index colXs col - paddingW * 2
             chH = S.index rowYs (row + 1) - S.index rowYs row - paddingH * 2
 
-    contentRender wenv node renderer = do
+    render wenv node renderer = do
       forM_ (neighbours rowYs) $ \(y1, y2, even) -> do
         let color
               | mouseover && _pY mouse >= (t + y1) && _pY mouse < (t + y2) = Just mouseOverColor
@@ -411,7 +454,7 @@ contentPane columnDefs model = node
         oddRowBgColor = (accentColor wenv) {_colorA = 0.1}
         lineColor = accentColor wenv
 
-    contentHandleEvent _wenv node _path = \case
+    handleEvent _wenv node _path = \case
       Move (Point _pX _pY) ->
         -- refresh which row shows as hovered
         Just (resultReqs node [RenderOnce])
@@ -433,6 +476,12 @@ initialModel columnDefs items = model
         { name,
           currentWidth = initialWidth
         }
+
+dragHandleWidth :: Int
+dragHandleWidth = 4
+
+dragHandleHeight :: Double
+dragHandleHeight = 40
 
 headerPaneKey :: Text
 headerPaneKey = "Hagrid.headerPane"
