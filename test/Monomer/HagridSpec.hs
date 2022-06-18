@@ -119,9 +119,7 @@ testColumn name getHeight =
 testCellWidget :: (TestItem -> SizeReq) -> TestItem -> WidgetNode s TestEvent
 testCellWidget getHeight item = wgt
   where
-    -- we need to change the text rather than just the size here, due to
-    -- https://github.com/fjvallarino/monomer/issues/168
-    wgt = label ("test " <> pack (show reqH)) `styleBasic` [sizeReqW reqW, sizeReqH reqH]
+    wgt = label "test" `styleBasic` [sizeReqW reqW, sizeReqH reqH]
     reqW = fixedSize 10
     reqH = getHeight item
 

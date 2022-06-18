@@ -7,14 +7,14 @@ packages:
 - completed:
     name: monomer
     version: 1.4.1.0
-    git: https://github.com/Dretch/monomer
+    git: https://github.com/fjvallarino/monomer
     pantry-tree:
       size: 17335
-      sha256: ed9be15a412023f4a71fa8d82facdebe25d5ceb36ecf3e2e6204aa1d9aab016b
-    commit: e2870908a5a632209056f1de338b112676a643b4
+      sha256: 3816b1479cab3619ce7c179b0af9d7669b45b26a58385b49520fe2cfac4544b2
+    commit: 353b4977fb11a7e60e624ef14131e7e440d978d3
   original:
-    git: https://github.com/Dretch/monomer
-    commit: e2870908a5a632209056f1de338b112676a643b4
+    git: https://github.com/fjvallarino/monomer
+    commit: 353b4977fb11a7e60e624ef14131e7e440d978d3
 - completed:
     name: sdl2
     version: 2.5.3.2
@@ -28,7 +28,7 @@ packages:
     commit: b4fe21c1025e4be9a1eb03c19f811e1776a2b292
 snapshots:
 - completed:
-    size: 590824
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2022/5/28.yaml
-    sha256: 1b1fbecac3fc9c8efb60b85fd7ce635c8278d0080a66c2ba0d6e4c03773f5f64
-  original: nightly-2022-05-28
+    size: 613126
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2022/6/18.yaml
+    sha256: fbe6493c7cf5d43c50e4c62e9e4cb777f2a4b72fb73f644b440797bb5d0a7170
+  original: nightly-2022-06-18
