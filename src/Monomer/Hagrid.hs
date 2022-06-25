@@ -99,18 +99,18 @@ data Column e a = Column
   }
 
 -- | How to create the widget that displays each cell in a column.
-data ColumnWidget e a where
-  -- | Create a label widget.
-  LabelWidget :: (a -> Text) -> ColumnWidget e a
-  -- | Create a widget of arbitrary type.
-  CustomWidget :: (forall s. a -> WidgetNode s e) -> ColumnWidget e a
+data ColumnWidget e a
+  = -- | Create a label widget.
+    LabelWidget (a -> Text)
+  | -- | Create a widget of arbitrary type.
+    CustomWidget (forall s. a -> WidgetNode s e)
 
 -- | Whether a column can be sorted by the user clicking the column header, and if so, how.
-data ColumnSortKey a where
-  -- | Means that a column can't be sorted.
-  DontSort :: ColumnSortKey a
-  -- | Means that a column can be sorted, using the specified sort key function.
-  SortWith :: Ord b => (a -> b) -> ColumnSortKey a
+data ColumnSortKey a
+  = -- | Means that a column can't be sorted.
+    DontSort
+  | -- | Means that a column can be sorted, using the specified sort key function.
+    forall b. Ord b => SortWith (a -> b)
 
 -- | Whether a column is being sorted in ascending or descending order.
 data SortDirection
