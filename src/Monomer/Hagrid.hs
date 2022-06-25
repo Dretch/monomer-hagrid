@@ -9,13 +9,18 @@
 -- | A datagrid widget for the Monomer UI library.
 module Monomer.Hagrid
   ( -- * Types
+    HagridCfg,
     Column (..),
     ColumnWidget (..),
     ColumnSortKey (..),
     SortDirection (..),
 
-    -- * Hagrid constructor
+    -- * Configuration options
+    initialSort,
+
+    -- * Hagrid constructors
     hagrid,
+    hagrid_,
 
     -- * Column constructors
     textColumn,
@@ -24,11 +29,12 @@ module Monomer.Hagrid
   )
 where
 
+import Control.Applicative ((<|>))
 import Control.Lens ((.~), (<>~), (^.))
 import Control.Lens.Combinators (non)
 import Control.Lens.Lens ((&))
 import Control.Monad as X (forM_)
-import Data.Default.Class as X (def)
+import Data.Default.Class as X (Default, def)
 import Data.Foldable (foldl')
 import qualified Data.List as List
 import Data.List.Index (indexed, izipWith, modifyAt)
@@ -45,12 +51,29 @@ import qualified Monomer.Lens as L
 import Monomer.Widgets.Container
 import Monomer.Widgets.Single
 
-data HagridEvent ep
-  = ContentScrollChange ScrollStatus
-  | OrderByColumn Int
-  | ResizeColumn Int Int
-  | ResizeColumnFinished Int
-  | ParentEvent ep
+-- | Configuration options for Hagrid widgets.
+data HagridCfg s e = HagridCfg
+  { cfgInitialSort :: Maybe (Int, SortDirection)
+  }
+
+instance Default (HagridCfg s e) where
+  def = HagridCfg {cfgInitialSort = Nothing}
+
+instance Semigroup (HagridCfg s e) where
+  c1 <> c2 = HagridCfg {cfgInitialSort = c2.cfgInitialSort <|> c1.cfgInitialSort}
+
+instance Monoid (HagridCfg s e) where
+  mempty = def
+
+-- | Configures the initial sort column and direction.
+initialSort ::
+  -- | The initial sort column (zero-indexed, out of bounds values will have no effect).
+  Int ->
+  -- | The initial sort direction.
+  SortDirection ->
+  HagridCfg s e
+initialSort column direction =
+  HagridCfg {cfgInitialSort = Just (column, direction)}
 
 -- | A column definition.
 data Column e a = Column
@@ -95,6 +118,13 @@ data SortDirection
   | SortDescending
   deriving (Eq, Show)
 
+data HagridEvent ep
+  = ContentScrollChange ScrollStatus
+  | OrderByColumn Int
+  | ResizeColumn Int Int
+  | ResizeColumnFinished Int
+  | ParentEvent ep
+
 data HagridModel a = HagridModel
   { sortedItems :: [a],
     columns :: [ModelColumn],
@@ -122,7 +152,7 @@ data HeaderDragHandleState = HeaderDragHandleState
   }
   deriving (Eq, Show)
 
--- | Creates a hagrid widget.
+-- | Creates a hagrid widget, using the default configuration.
 hagrid ::
   forall a s e.
   (CompositeModel a, WidgetModel s, WidgetEvent e) =>
@@ -131,14 +161,26 @@ hagrid ::
   -- | The items for each row in the grid.
   [a] ->
   WidgetNode s e
-hagrid columnDefs items = widget
+hagrid = hagrid_ def
+
+-- | Creates a hagrid widget, using the given configuration.
+hagrid_ ::
+  forall a s e.
+  (CompositeModel a, WidgetModel s, WidgetEvent e) =>
+  [HagridCfg s e] ->
+  -- | The definitions for each column in the grid.
+  [Column e a] ->
+  -- | The items for each row in the grid.
+  [a] ->
+  WidgetNode s e
+hagrid_ cfg columnDefs items = widget
   where
     -- todo: accept lens ?
 
     widget =
       compositeD_
         "Hagrid.Root"
-        (WidgetValue (initialModel columnDefs items))
+        (WidgetValue (initialModel cfg columnDefs items))
         buildUI
         handleEvent
         [compositeMergeModel mergeModel]
@@ -460,17 +502,25 @@ contentPane columnDefs model = node
         Just (resultReqs node [RenderOnce])
       _ -> Nothing
 
-initialModel :: [Column ep a] -> [a] -> HagridModel a
-initialModel columnDefs items = model
+initialModel :: [HagridCfg s e] -> [Column ep a] -> [a] -> HagridModel a
+initialModel cfg columnDefs items = model
   where
     model =
       sortItems columnDefs $
         HagridModel
           { sortedItems = items,
             columns = initialColumn <$> columnDefs,
-            sortColumn = Nothing,
-            sortDirection = SortAscending
+            sortColumn,
+            sortDirection
           }
+
+    (sortColumn, sortDirection)
+      | Just (col, dir) <- (mconcat cfg).cfgInitialSort,
+        col >= 0,
+        col < length columnDefs =
+          (Just col, dir)
+      | otherwise = (Nothing, SortAscending)
+
     initialColumn Column {name, initialWidth} =
       ModelColumn
         { name,

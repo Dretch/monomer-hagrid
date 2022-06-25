@@ -11,7 +11,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time (Day, addDays, defaultTimeLocale, formatTime, fromGregorian)
 import Monomer
-import Monomer.Hagrid (Column (..), ColumnSortKey (SortWith), SortDirection, hagrid, showOrdColumn, textColumn, widgetColumn)
+import Monomer.Hagrid (Column (..), ColumnSortKey (SortWith), SortDirection (SortDescending), hagrid_, initialSort, showOrdColumn, textColumn, widgetColumn)
 import Text.Printf (printf)
 
 data AppModel = AppModel
@@ -81,7 +81,8 @@ buildUI _wenv model = tree
           ]
 
     grid =
-      hagrid
+      hagrid_
+        [initialSort 1 SortDescending]
         (mconcat (zipWith column model.columns gridColumns))
         model.spiders
 
