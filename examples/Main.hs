@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
@@ -7,17 +8,18 @@
 module Main (main) where
 
 import Control.Lens (Ixed (ix), makeLensesFor, singular)
-import Data.Text (Text)
+import Data.Text (Text, pack)
 import qualified Data.Text as T
 import Data.Time (Day, addDays, defaultTimeLocale, formatTime, fromGregorian)
 import Monomer
-import Monomer.Hagrid (Column (..), ColumnSortKey (SortWith), SortDirection (SortDescending), hagrid_, initialSort, showOrdColumn, textColumn, widgetColumn)
+import Monomer.Hagrid (Column (..), ColumnSortKey (SortWith), SortDirection (SortDescending), hagrid_, initialSort, scrollToRow, showOrdColumn, textColumn, widgetColumn)
 import Text.Printf (printf)
 
 data AppModel = AppModel
   { theme :: Theme,
     spiders :: [Spider],
-    columns :: [AppColumn]
+    columns :: [AppColumn],
+    rowToScrollTo :: Int
   }
   deriving (Eq, Show)
 
@@ -27,8 +29,10 @@ newtype AppColumn = AppColumn
 
 data AppEvent
   = FeedSpider Text
+  | AddSpider
   | NameColumnResized Int
   | NameColumnSorted SortDirection
+  | ScrollToOriginalIndex
 
 data Spider = Spider
   { index :: Integer,
@@ -40,7 +44,7 @@ data Spider = Spider
   deriving (Eq, Show)
 
 makeLensesFor [("enabled", "_enabled")] ''AppColumn
-makeLensesFor [("columns", "_columns"), ("theme", "_theme")] ''AppModel
+makeLensesFor [("columns", "_columns"), ("theme", "_theme"), ("rowToScrollTo", "_rowToScrollTo")] ''AppModel
 
 main :: IO ()
 main = startApp model handleEvent buildUI config
@@ -54,16 +58,17 @@ main = startApp model handleEvent buildUI config
       AppModel
         { theme = darkTheme,
           spiders = spiders,
-          columns = AppColumn True <$ gridColumns
+          columns = AppColumn True <$ gridColumns,
+          rowToScrollTo = 0
         }
-    spiders = spider <$> [1 .. numSpiders]
+    spiders = spider <$> [0 .. numSpiders - 1]
     spider i =
       Spider
         { index = i,
           species = "Acromantula",
-          name = T.pack (printf "Son of Aragog %d" i),
-          dateOfBirth = addDays i (fromGregorian 1942 3 0),
-          weightKilos = fromIntegral (numSpiders + 1 - i) * 2.3
+          name = T.pack (printf "Son of Aragog %d" (i + 1)),
+          dateOfBirth = addDays i (fromGregorian 1942 3 1),
+          weightKilos = fromIntegral (numSpiders + 2 - i) * 2.3
         }
     numSpiders = 100
 
@@ -73,10 +78,10 @@ buildUI _wenv model = tree
     tree =
       themeSwitch_ model.theme [themeClearBg] $
         vstack
-          [ grid,
+          [ grid `nodeKey` hagridKey,
             vstack_
               [childSpacing]
-              (themeConfigurer : columnConfigurers)
+              (themeConfigurer : columnConfigurers <> actionButtons)
               `styleBasic` [padding 8]
           ]
 
@@ -106,14 +111,47 @@ buildUI _wenv model = tree
         (_columns . singular (ix idx) . _enabled)
         [textRight]
 
+    actionButtons =
+      [ hstack_
+          [childSpacing]
+          [ label "Scroll to index of unsorted list",
+            numericField _rowToScrollTo,
+            button "Go!" ScrollToOriginalIndex
+          ],
+        hstack_
+          [childSpacing]
+          [button "Add spider" AddSpider]
+      ]
+
 handleEvent :: EventHandler AppModel AppEvent sp ep
-handleEvent _wenv _node _model = \case
+handleEvent _wenv _node model = \case
   FeedSpider name ->
     [Producer (const (putStrLn ("Feeding spider " <> T.unpack name)))]
+  AddSpider ->
+    [Model model {spiders = model.spiders <> [newSpider model]}]
   NameColumnResized colWidth ->
     [Producer (const (putStrLn ("Name column was resized: " <> show colWidth)))]
   NameColumnSorted direction ->
     [Producer (const (putStrLn ("Name column was sorted: " <> show direction)))]
+  ScrollToOriginalIndex ->
+    [scrollToRow (WidgetKey hagridKey) (rowScrollIndex model)]
+
+newSpider :: AppModel -> Spider
+newSpider model =
+  Spider
+    { index = fromIntegral (length model.spiders),
+      name = "Extra Spider " <> pack (show (length model.spiders)),
+      species = "Spider plant",
+      dateOfBirth = fromGregorian 2022 6 26,
+      weightKilos = 0.01
+    }
+
+rowScrollIndex :: AppModel -> [(Spider, Int)] -> Maybe Int
+rowScrollIndex model items
+  | model.rowToScrollTo >= 0 && model.rowToScrollTo < length items =
+      Just (snd (items !! model.rowToScrollTo))
+  | otherwise =
+      Nothing
 
 gridColumns :: [Column AppEvent Spider]
 gridColumns = cols
@@ -144,3 +182,6 @@ gridColumns = cols
     actionsColumn :: Spider -> WidgetNode s AppEvent
     actionsColumn spdr =
       button "Feed" (FeedSpider spdr.name)
+
+hagridKey :: Text
+hagridKey = "SpiderHagrid"

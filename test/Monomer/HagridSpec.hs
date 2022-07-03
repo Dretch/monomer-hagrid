@@ -2,7 +2,7 @@ module Monomer.HagridSpec (spec) where
 
 import Control.Lens ((&), (.~), (^.))
 import qualified Data.Foldable as Foldable
-import Data.Text (Text, pack)
+import Data.Text (Text)
 import Monomer
 import Monomer.Hagrid
 import qualified Monomer.Lens as L

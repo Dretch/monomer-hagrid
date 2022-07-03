@@ -13,6 +13,7 @@ A datagrid widget for the [Monomer](https://github.com/fjvallarino/monomer) libr
 - Column sorting, with a customizable sort key.
 - Custom widgets for each cell, to override the standard label.
 - Custom width/height padding for each cell, configured per column.
+- Can scroll to a particular row when sent a message.
 
 ## Goals
 - Have complete and helpful documentation.
@@ -20,6 +21,10 @@ A datagrid widget for the [Monomer](https://github.com/fjvallarino/monomer) libr
 - Be no uglier than standard Monomer widgets.
 - Be performant with ten thousand rows (but not with ten million).
 - Have some tests.
+
+## Todo List
+- Improve performance with lots of rows (e.g. 1000).
+- Explore providing an API where current sort/column widths/etc are stored in the parent model and updated by hagrid via a lens. This may remove some complexity around merging and the specification of initial sorts/column widths.
 
 ## To build and run examples
 ```bash

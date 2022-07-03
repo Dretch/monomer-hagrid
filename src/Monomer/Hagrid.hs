@@ -14,6 +14,7 @@ module Monomer.Hagrid
     ColumnWidget (..),
     ColumnSortKey (..),
     SortDirection (..),
+    ScrollToRowCallback,
 
     -- * Configuration options
     initialSort,
@@ -22,10 +23,13 @@ module Monomer.Hagrid
     hagrid,
     hagrid_,
 
-    -- * Column constructors
+    -- * Column Constructors
     textColumn,
     showOrdColumn,
     widgetColumn,
+
+    -- * Messages
+    scrollToRow,
   )
 where
 
@@ -34,6 +38,7 @@ import Control.Lens ((.~), (<>~), (^.))
 import Control.Lens.Combinators (non)
 import Control.Lens.Lens ((&))
 import Control.Monad as X (forM_)
+import Data.Data (Typeable)
 import Data.Default.Class as X (Default, def)
 import Data.Foldable (foldl')
 import qualified Data.List as List
@@ -118,18 +123,27 @@ data SortDirection
   | SortDescending
   deriving (Eq, Show)
 
+-- | Picks an item to scroll to, based on the sorted or original grid contents.
+type ScrollToRowCallback a =
+  -- | The items in the grid, in the originally provided order, along with each item's index
+  -- in the current grid order.
+  [(a, Int)] ->
+  -- | The row to scroll to, as an index into the sorted items (e.g. 0 is always the first row
+  -- in the grid, regardless of the current order). 'Nothing' will cancel the scroll.
+  Maybe Int
+
 data HagridEvent ep
   = ContentScrollChange ScrollStatus
   | OrderByColumn Int
   | ResizeColumn Int Int
   | ResizeColumnFinished Int
+  | forall a. Typeable a => ScrollToRow (ScrollToRowCallback a)
   | ParentEvent ep
 
 data HagridModel a = HagridModel
   { sortedItems :: [a],
     columns :: [ModelColumn],
-    sortColumn :: Maybe Int,
-    sortDirection :: SortDirection
+    sortColumn :: Maybe (Int, SortDirection)
   }
   deriving (Eq, Show)
 
@@ -151,6 +165,9 @@ data HeaderDragHandleState = HeaderDragHandleState
     dragStartColumnW :: Int
   }
   deriving (Eq, Show)
+
+data ContentPaneMessage a
+  = ContentPaneScrollToRow (ScrollToRowCallback a)
 
 -- | Creates a hagrid widget, using the default configuration.
 hagrid ::
@@ -181,38 +198,47 @@ hagrid_ cfg columnDefs items = widget
       compositeD_
         "Hagrid.Root"
         (WidgetValue (initialModel cfg columnDefs items))
-        buildUI
+        (buildUI items)
         handleEvent
         [compositeMergeModel mergeModel]
 
-    buildUI :: UIBuilder (HagridModel a) (HagridEvent e)
-    buildUI _wenv model = tree
+    buildUI :: [a] -> UIBuilder (HagridModel a) (HagridEvent e)
+    buildUI items _wenv model = tree
       where
         tree =
           vstack
             [ headerPane columnDefs model `nodeKey` headerPaneKey,
-              scroll_ [onChange ContentScrollChange] $
-                contentPane columnDefs model `nodeKey` contentPaneKey
+              contentScroll `nodeKey` contentScrollKey
             ]
+        contentScroll =
+          scroll_ [onChange ContentScrollChange] $
+            contentPane columnDefs items model `nodeKey` contentPaneKey
 
     handleEvent :: EventHandler (HagridModel a) (HagridEvent e) sp e
     handleEvent wenv _node model = \case
+      ScrollToRow row ->
+        [Message (WidgetKey contentPaneKey) (ContentPaneScrollToRow row)]
       ContentScrollChange ScrollStatus {scrollDeltaX} ->
         [ Message (WidgetKey headerPaneKey) (ScrollHeaderPaneTo scrollDeltaX)
         ]
       OrderByColumn colIndex -> result
         where
-          Column {sortHandler} = columnDefs !! colIndex
-          newModel
-            | Just c <- model.sortColumn,
+          Column {sortHandler, sortKey} = columnDefs !! colIndex
+          (sortColumn, sortedItems)
+            | Just (c, dir) <- model.sortColumn,
               c == colIndex =
-                model {sortDirection = flipSortDirection model.sortDirection}
+                let sortColumn = Just (colIndex, flipSortDirection dir)
+                    sortedItems = reverse model.sortedItems
+                 in (sortColumn, sortedItems)
             | otherwise =
-                model {sortColumn = Just colIndex, sortDirection = SortAscending}
-          result =
-            Model (sortItems columnDefs newModel) : handler
+                let sortColumn = Just (colIndex, SortAscending)
+                    sortedItems = sortItems columnDefs sortColumn model.sortedItems
+                 in (sortColumn, sortedItems)
+          result = case sortKey of
+            DontSort -> []
+            SortWith _ -> Model model {sortColumn, sortedItems} : handler
           handler =
-            Report <$> maybeToList (sortHandler <*> Just newModel.sortDirection)
+            Report <$> maybeToList (sortHandler <*> (snd <$> sortColumn))
       ResizeColumn colIndex newWidth ->
         [ Model (model {columns = modifyAt colIndex (\c -> c {currentWidth = newWidth}) model.columns}),
           Request (ResizeWidgets headerPaneId),
@@ -230,14 +256,18 @@ hagrid_ cfg columnDefs items = widget
         headerPaneId = fromJust (widgetIdFromKey wenv (WidgetKey headerPaneKey))
         contentPaneId = fromJust (widgetIdFromKey wenv (WidgetKey contentPaneKey))
 
-    -- If the column names have not changed then preseve the column widths too,
-    -- otherwise item/theme/etc changes will reset the column widths
+    -- If the column names have not changed then preseve the column widths and sort
+    -- order too, otherwise unrelated model changes will reset the column widths/sort.
     mergeModel :: MergeModelHandler (HagridModel a) (HagridEvent e) s
     mergeModel _wenv _parentModel oldModel newModel = resultModel
       where
         resultModel
           | columnNames oldModel == columnNames newModel =
-              newModel {columns = oldModel.columns}
+              newModel
+                { columns = oldModel.columns,
+                  sortColumn = oldModel.sortColumn,
+                  sortedItems = sortItems columnDefs oldModel.sortColumn newModel.sortedItems
+                }
           | otherwise =
               newModel
         columnNames m =
@@ -339,8 +369,8 @@ headerPane columnDefs model = makeNode (HeaderPaneState 0)
         renderAfter wenv node renderer =
           forM_ model.sortColumn (renderSortIndicator wenv node renderer)
 
-        renderSortIndicator wenv node renderer sortCol = do
-          drawSortIndicator renderer indRect (Just (accentColor wenv)) model.sortDirection
+        renderSortIndicator wenv node renderer (sortCol, sortDirection) = do
+          drawSortIndicator renderer indRect (Just (accentColor wenv)) sortDirection
           where
             style = wenv ^. L.theme . L.basic . L.btnStyle
             Rect l t _w h = node ^. L.info . L.viewport
@@ -348,7 +378,7 @@ headerPane columnDefs model = makeNode (HeaderPaneState 0)
             colOffset = fromIntegral (sum (take (sortCol + 1) (currentWidth <$> model.columns)) - dragHandleWidth)
             indW = unFontSize size * 2 / 3
             pad = indW / 3
-            indT = case model.sortDirection of
+            indT = case sortDirection of
               SortAscending -> h - pad - indW
               SortDescending -> t + pad
             indL = l + state.offsetX + colOffset - indW - pad
@@ -418,8 +448,14 @@ headerDragHandle colIndex columnDef column = tree
           where
             vp = node ^. L.info . L.viewport
 
-contentPane :: (CompositeModel a, WidgetEvent ep) => [Column ep a] -> HagridModel a -> WidgetNode (HagridModel a) (HagridEvent ep)
-contentPane columnDefs model = node
+contentPane ::
+  forall a ep.
+  (CompositeModel a, WidgetEvent ep) =>
+  [Column ep a] ->
+  [a] ->
+  HagridModel a ->
+  WidgetNode (HagridModel a) (HagridEvent ep)
+contentPane columnDefs items model = node
   where
     node =
       defaultWidgetNode "Hagrid.ContentPane" contentPaneContainer
@@ -438,7 +474,8 @@ contentPane columnDefs model = node
           { containerGetSizeReq = getSizeReq,
             containerResize = resize,
             containerRender = render,
-            containerHandleEvent = handleEvent
+            containerHandleEvent = handleEvent,
+            containerHandleMessage = handleMessage
           }
 
     getSizeReq _wenv _node children = (w, h)
@@ -502,24 +539,51 @@ contentPane columnDefs model = node
         Just (resultReqs node [RenderOnce])
       _ -> Nothing
 
+    handleMessage :: ContainerMessageHandler (HagridModel a) (HagridEvent ep)
+    handleMessage wenv node _path msg = result
+      where
+        result = cast msg >>= handleTypedMessage
+
+        handleTypedMessage (ContentPaneScrollToRow callback) = result
+          where
+            result
+              | Just row <- callback indexedItems,
+                Just y1 <- S.lookup row rowYs,
+                Just y2 <- S.lookup (row + 1) rowYs =
+                  Just (resultReqs node [SendMessage scrollId (ScrollTo (Rect vp._rX (vp._rY + y1) 1 (y2 - y1)))])
+              | otherwise =
+                  Nothing
+
+            indexedItems = case modelSortKey columnDefs model.sortColumn of
+              DontSort ->
+                zip items [0 ..]
+              SortWith f ->
+                List.sortOn (f . snd) (indexed items)
+                  & indexed
+                  & List.sortOn (fst . snd)
+                  & map (\(sortedIndex, (_, item)) -> (item, sortedIndex))
+
+            vp = node ^. L.info . L.viewport
+            rowYs = sizesToPositions (toRowHeights (node ^. L.children) columnDefsSeq)
+
+            scrollId = fromJust (widgetIdFromKey wenv (WidgetKey contentScrollKey))
+
 initialModel :: [HagridCfg s e] -> [Column ep a] -> [a] -> HagridModel a
 initialModel cfg columnDefs items = model
   where
     model =
-      sortItems columnDefs $
-        HagridModel
-          { sortedItems = items,
-            columns = initialColumn <$> columnDefs,
-            sortColumn,
-            sortDirection
-          }
+      HagridModel
+        { sortedItems = sortItems columnDefs sortColumn items,
+          columns = initialColumn <$> columnDefs,
+          sortColumn
+        }
 
-    (sortColumn, sortDirection)
+    sortColumn
       | Just (col, dir) <- (mconcat cfg).cfgInitialSort,
         col >= 0,
         col < length columnDefs =
-          (Just col, dir)
-      | otherwise = (Nothing, SortAscending)
+          Just (col, dir)
+      | otherwise = Nothing
 
     initialColumn Column {name, initialWidth} =
       ModelColumn
@@ -536,18 +600,26 @@ dragHandleHeight = 40
 headerPaneKey :: Text
 headerPaneKey = "Hagrid.headerPane"
 
+contentScrollKey :: Text
+contentScrollKey = "Hagrid.contentScroll"
+
 contentPaneKey :: Text
 contentPaneKey = "Hagrid.contentPane"
 
-sortItems :: [Column ep a] -> HagridModel a -> HagridModel a
-sortItems columnDefs model = case model.sortColumn of
-  Just sc
+sortItems :: [Column ep a] -> Maybe (Int, SortDirection) -> [a] -> [a]
+sortItems columnDefs sortColumn items = case modelSortKey columnDefs sortColumn of
+  DontSort -> items
+  SortWith f -> List.sortOn f items
+
+modelSortKey :: [Column ep a] -> Maybe (Int, SortDirection) -> ColumnSortKey a
+modelSortKey columnDefs sortColumn = case sortColumn of
+  Just (sc, dir)
     | Column {sortKey = SortWith f} <- columnDefs !! sc ->
-        case model.sortDirection of
-          SortAscending -> model {sortedItems = List.sortOn f model.sortedItems}
-          SortDescending -> model {sortedItems = List.sortOn (Down . f) model.sortedItems}
+        case dir of
+          SortAscending -> SortWith f
+          SortDescending -> SortWith (Down . f)
   _ ->
-    model
+    DontSort
 
 sizesToPositions :: Seq Double -> Seq Double
 sizesToPositions = S.scanl (+) 0
@@ -629,6 +701,19 @@ cellWidget item = \case
         get model
       handleEvent _wenv _node _model e =
         [Report (ParentEvent e)]
+
+-- | Sends a message to the targeted 'hagrid' widget, that causes the
+-- widget to scroll such that a specified row becomes visible.
+scrollToRow ::
+  forall s e sp ep a.
+  (Typeable a, Typeable e) =>
+  -- | The widget to target.
+  WidgetKey ->
+  -- | Determines which row to scroll to.
+  ScrollToRowCallback a ->
+  EventResponse s e sp ep
+scrollToRow key row =
+  Message key (ScrollToRow row :: HagridEvent e)
 
 defaultColumnInitialWidth :: Int
 defaultColumnInitialWidth = 100
