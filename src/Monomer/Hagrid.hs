@@ -378,7 +378,7 @@ headerPane columnDefs model = makeNode (HeaderPaneState 0)
             indW = unFontSize size * 2 / 3
             pad = indW / 3
             indT = case sortDirection of
-              SortAscending -> h - pad - indW
+              SortAscending -> t + h - pad - indW
               SortDescending -> t + pad
             indL = l + state.offsetX + colOffset - indW - pad
             indRect = Rect indL indT indW indW
