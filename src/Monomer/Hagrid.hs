@@ -107,7 +107,7 @@ data ColumnWidget e a
   = -- | Create a label widget.
     LabelWidget (a -> Text)
   | -- | Create a widget of arbitrary type.
-    CustomWidget (forall s. a -> WidgetNode s e)
+    CustomWidget (forall s. WidgetModel s => a -> WidgetNode s e)
 
 -- | Whether a column can be sorted by the user clicking the column header, and if so, how.
 data ColumnSortKey a
