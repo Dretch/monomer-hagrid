@@ -11,6 +11,7 @@ A datagrid widget for the [Monomer](https://github.com/fjvallarino/monomer) libr
 - Vertical and horizontal scrolling.
 - Resizable columns.
 - Column sorting, with a customizable sort key.
+- Configurable column alignment (left or right).
 - Custom widgets for each cell, to override the standard label.
 - Custom width/height padding for each cell, configured per column.
 - Can scroll to a particular row when sent a message.

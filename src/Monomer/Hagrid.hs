@@ -3,6 +3,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 
 -- | A datagrid widget for the Monomer UI library.
@@ -10,6 +11,7 @@ module Monomer.Hagrid
   ( -- * Types
     HagridCfg,
     Column (..),
+    ColumnAlign (..),
     ColumnWidget (..),
     ColumnSortKey (..),
     SortDirection (..),
@@ -85,6 +87,8 @@ data Column e a = Column
     name :: Text,
     -- | Creates the widget for each cell in the column.
     widget :: ColumnWidget e a,
+    -- | How to align the widget within each cell in the column.
+    align :: ColumnAlign,
     -- | Determines if and how the column can be sorted by clicking the column header.
     sortKey :: ColumnSortKey a,
     -- | The initial width of the column, in pixels. The user can then change the
@@ -108,6 +112,12 @@ data ColumnWidget e a
     LabelWidget (a -> Text)
   | -- | Create a widget of arbitrary type.
     CustomWidget (forall s. WidgetModel s => a -> WidgetNode s e)
+
+-- | How to align the widget within each cell of a column.
+data ColumnAlign
+  = ColumnAlignLeft
+  | ColumnAlignRight
+  deriving (Eq, Show)
 
 -- | Whether a column can be sorted by the user clicking the column header, and if so, how.
 data ColumnSortKey a
@@ -463,7 +473,7 @@ contentPane columnDefs items model = node
     childWidgetRows =
       [[cellWidget item widget | Column {widget} <- columnDefs] | item <- model.sortedItems]
 
-    nRows = length model.sortedItems
+    nCols = length columnDefs
     columnDefsSeq = S.fromList columnDefs
 
     contentPaneContainer =
@@ -490,17 +500,32 @@ contentPane columnDefs items model = node
         colXs = sizesToPositions (S.fromList (fromIntegral . currentWidth <$> model.columns))
         rowYs = sizesToPositions (toRowHeights children columnDefsSeq)
 
-        assignedAreas = S.fromList $ do
-          row <- [0 .. nRows - 1]
-          (col, columnDef) <- indexed columnDefs
-          pure (assignArea col columnDef row)
+        assignedAreas = do
+          (rowN, row) <-
+            S.mapWithIndex (\i -> (i,)) (S.chunksOf nCols children)
+          (colN, columnDef, widget) <-
+            S.mapWithIndex (\i (cd, w) -> (i, cd, w)) (S.zip columnDefsSeq row)
+          pure (assignArea colN columnDef rowN widget)
 
-        assignArea col Column {paddingW, paddingH} row = Rect chX chY chW chH
+        assignArea col Column {paddingW, paddingH, align} row widget = Rect chX chY chW chH
           where
-            chX = l + S.index colXs col + paddingW
-            chY = t + S.index rowYs row + paddingH
-            chW = S.index colXs (col + 1) - S.index colXs col - paddingW * 2
-            chH = S.index rowYs (row + 1) - S.index rowYs row - paddingH * 2
+            (chX, chW)
+              | widgetReqW >= cellW = (cellX, cellW)
+              | align == ColumnAlignLeft = (cellX, widgetReqW)
+              | otherwise = (cellX + cellW - widgetReqW, widgetReqW)
+            (chY, chH) =
+              (cellY, cellH)
+
+            cellX = l + S.index colXs col + paddingW
+            cellY = t + S.index rowYs row + paddingH
+            cellW = S.index colXs (col + 1) - S.index colXs col - paddingW * 2
+            cellH = S.index rowYs (row + 1) - S.index rowYs row - paddingH * 2
+
+            widgetReqW =
+              widget
+                & _wnInfo
+                & _wniSizeReqW
+                & \r -> _szrFixed r + _szrFlex r
 
     render wenv node renderer = do
       forM_ (neighbours rowYs) $ \(y1, y2, even) -> do
@@ -680,6 +705,7 @@ defaultColumn name widget =
   Column
     { name,
       widget,
+      align = ColumnAlignLeft,
       initialWidth = defaultColumnInitialWidth,
       sortKey = DontSort,
       minWidth = defaultColumnMinWidth,

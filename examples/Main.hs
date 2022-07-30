@@ -11,7 +11,7 @@ import Data.Text (Text, pack)
 import qualified Data.Text as T
 import Data.Time (Day, addDays, defaultTimeLocale, formatTime, fromGregorian)
 import Monomer
-import Monomer.Hagrid (Column (..), ColumnSortKey (SortWith), SortDirection (SortDescending), hagrid_, initialSort, scrollToRow, showOrdColumn, textColumn, widgetColumn)
+import Monomer.Hagrid (Column (..), ColumnAlign (..), ColumnSortKey (SortWith), SortDirection (SortDescending), hagrid_, initialSort, scrollToRow, showOrdColumn, textColumn, widgetColumn)
 import Text.Printf (printf)
 
 data AppModel = AppModel
@@ -156,7 +156,9 @@ gridColumns :: [Column AppEvent Spider]
 gridColumns = cols
   where
     cols =
-      [ showOrdColumn "Index" (.index),
+      [ (showOrdColumn "Index" (.index))
+          { align = ColumnAlignRight
+          },
         (textColumn "Name" (.name))
           { initialWidth = 300,
             resizeHandler = Just NameColumnResized,
@@ -170,7 +172,8 @@ gridColumns = cols
           },
         (textColumn "Weight (Kg)" (T.pack . printf "%.2f" . weightKilos))
           { sortKey = SortWith weightKilos,
-            initialWidth = 200
+            initialWidth = 200,
+            align = ColumnAlignRight
           },
         (widgetColumn "Actions" actionsColumn)
           { initialWidth = 100,
