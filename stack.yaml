@@ -41,7 +41,7 @@ packages:
 #   commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a
 extra-deps:
 - git: "https://github.com/fjvallarino/monomer"
-  commit: "4ad9fe26477f33d8e9cfd49ecd7b5e39d0622efd"
+  commit: "d080022da50b50959c83c8e3d6953eeda3804b53"
   # needed to get https://github.com/haskell-game/sdl2/pull/264
 - git: "https://github.com/haskell-game/sdl2"
   commit: b4fe21c1025e4be9a1eb03c19f811e1776a2b292
