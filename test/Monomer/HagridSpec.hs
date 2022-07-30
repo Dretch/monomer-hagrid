@@ -120,7 +120,7 @@ testCellWidget :: (TestItem -> SizeReq) -> TestItem -> WidgetNode s TestEvent
 testCellWidget getHeight item = wgt
   where
     wgt = label "test" `styleBasic` [sizeReqW reqW, sizeReqH reqH]
-    reqW = fixedSize 10
+    reqW = fixedSize 100
     reqH = getHeight item
 
 cellViewports :: [Column TestEvent TestItem] -> [TestItem] -> [Rect]
