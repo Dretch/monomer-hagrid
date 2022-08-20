@@ -14,8 +14,8 @@ A datagrid widget for the [Monomer](https://github.com/fjvallarino/monomer) libr
 - Configurable column alignment (left or right).
 - Custom widgets for each cell, to override the standard label.
 - Custom width/height padding for each cell, configured per column.
-- Can scroll to a particular row when sent a message.
-- Can add footer widgets to the bottom of each column.
+- Scrolling to a particular row when sent a message.
+- Custom footer widgets on the bottom of each column.
 
 ## Goals
 - Have complete and helpful documentation.
