@@ -5,7 +5,7 @@ A datagrid widget for the [Monomer](https://github.com/fjvallarino/monomer) libr
 ![Example hagrid widget screenshot](readme/example.png)
 
 ## Current Status
-- Somewhat buggy and incomplete. Just a toy.
+- Somewhat buggy and incomplete. Don't build your business on this.
 
 ## Features
 - Vertical and horizontal scrolling.
@@ -35,7 +35,7 @@ stack run
 
 ## Contribution Guide
 - This is "free as in mattress" software!
-- You are welcome to open an issue with comments and feature requests, but you may not get a response.
+- You are welcome to open an issue with bug reports or feature requests, but you may not get a response.
 - Unsolicited pull requests will likely be ignored.
 
 ### To format the source code
