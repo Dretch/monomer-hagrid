@@ -7,11 +7,12 @@
 module Main (main) where
 
 import Control.Lens (Ixed (ix), makeLensesFor, singular)
+import Data.List.Index (setAt)
 import Data.Text (Text, pack)
 import qualified Data.Text as T
 import Data.Time (Day, addDays, defaultTimeLocale, formatTime, fromGregorian)
 import Monomer
-import Monomer.Hagrid (Column (..), ColumnAlign (..), ColumnSortKey (SortWith), SortDirection (SortDescending), hagrid_, initialSort, scrollToRow, showOrdColumn, textColumn, widgetColumn)
+import Monomer.Hagrid (Column (..), ColumnAlign (..), ColumnFooterWidget (..), ColumnSortKey (..), SortDirection (..), hagrid_, initialSort, scrollToRow, showOrdColumn, textColumn, widgetColumn)
 import Text.Printf (printf)
 
 data AppModel = AppModel
@@ -27,7 +28,7 @@ newtype AppColumn = AppColumn
   deriving (Eq, Show)
 
 data AppEvent
-  = FeedSpider Text
+  = FeedSpider Int
   | AddSpider
   | NameColumnResized Int
   | NameColumnSorted SortDirection
@@ -50,8 +51,10 @@ main = startApp model handleEvent buildUI config
   where
     config =
       [ appWindowTitle "Hagrid Examples",
+        appFontDef "Bold" "./assets/fonts/Cantarell/Cantarell-Bold.ttf",
         appFontDef "Regular" "./assets/fonts/Cantarell/Cantarell-Regular.ttf",
-        appDisableAutoScale True
+        appDisableAutoScale True,
+        appWindowState (MainWindowNormal (1400, 1000))
       ]
     model =
       AppModel
@@ -124,8 +127,13 @@ buildUI _wenv model = tree
 
 handleEvent :: EventHandler AppModel AppEvent sp ep
 handleEvent _wenv _node model = \case
-  FeedSpider name ->
-    [Producer (const (putStrLn ("Feeding spider " <> T.unpack name)))]
+  FeedSpider idx -> evts
+    where
+      evts =
+        [ Producer (const (putStrLn ("Feeding spider " <> T.unpack spdr.name))),
+          Model model {spiders = setAt idx spdr {weightKilos = spdr.weightKilos + 1} model.spiders}
+        ]
+      spdr = model.spiders !! idx
   AddSpider ->
     [Model model {spiders = model.spiders <> [newSpider model]}]
   NameColumnResized colWidth ->
@@ -157,7 +165,9 @@ gridColumns = cols
   where
     cols =
       [ (showOrdColumn "Index" (.index))
-          { align = ColumnAlignRight
+          { initialWidth = 120,
+            align = ColumnAlignRight,
+            footerWidget = CustomFooterWidget countFooter
           },
         (textColumn "Name" (.name))
           { initialWidth = 300,
@@ -173,7 +183,8 @@ gridColumns = cols
         (textColumn "Weight (Kg)" (T.pack . printf "%.2f" . weightKilos))
           { sortKey = SortWith weightKilos,
             initialWidth = 200,
-            align = ColumnAlignRight
+            align = ColumnAlignRight,
+            footerWidget = CustomFooterWidget sumWeightFooter
           },
         (widgetColumn "Actions" actionsColumn)
           { initialWidth = 100,
@@ -181,9 +192,27 @@ gridColumns = cols
             paddingH = 5
           }
       ]
-    actionsColumn :: Spider -> WidgetNode s AppEvent
-    actionsColumn spdr =
-      button "Feed" (FeedSpider spdr.name)
+
+    countFooter spiders =
+      labelledFooter "Count" (T.pack . show . length $ spiders)
+
+    sumWeightFooter spiders = tree
+      where
+        tree = labelledFooter "Sum" (T.pack (printf "%.2f" totalWeightKilos))
+        totalWeightKilos = sum (weightKilos . fst <$> spiders)
+
+    labelledFooter labelText text =
+      hstack
+        [ label labelText,
+          filler,
+          label text
+            `styleBasic` [textFont "Bold"]
+        ]
+        `styleBasic` [padding 10]
+
+    actionsColumn :: Int -> Spider -> WidgetNode s AppEvent
+    actionsColumn idx _spdr =
+      button "Feed" (FeedSpider idx)
 
 hagridKey :: Text
 hagridKey = "SpiderHagrid"

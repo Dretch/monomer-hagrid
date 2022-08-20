@@ -1,8 +1,10 @@
 module Monomer.HagridSpec (spec) where
 
+import Control.Concurrent (newEmptyMVar, putMVar, takeMVar)
 import Control.Lens ((&), (.~), (^.))
 import qualified Data.Foldable as Foldable
 import Data.Text (Text)
+import GHC.IO (unsafePerformIO)
 import Monomer
 import Monomer.Hagrid
 import qualified Monomer.Lens as L
@@ -23,6 +25,7 @@ spec = do
   resize
   sorting
   merging
+  messages
 
 resize :: Spec
 resize = describe "resize" $ do
@@ -110,14 +113,43 @@ merging = describe "merging" $ do
     columnWidths startNode `shouldBe` [75]
     columnWidths resizedNode `shouldBe` [75]
 
+messages :: Spec
+messages = describe "messages" $ do
+  it "should give items and sorted indices to scrollToRow callback" $ do
+    itemsMVar <- newEmptyMVar
+    let cols =
+          [(textColumn "Col" (const "")) {sortKey = SortWith (_szrFixed . sizeReq)}]
+        items =
+          [ TestItem (fixedSize 1),
+            TestItem (fixedSize 2),
+            TestItem (fixedSize 3)
+          ]
+        {-# NOINLINE scrollToRowCallback #-}
+        scrollToRowCallback cbItems =
+          unsafePerformIO (Nothing <$ putMVar itemsMVar cbItems) -- hacky, but seems to work!
+        buildUI _wenv _model =
+          hagrid_ [initialSort 0 SortDescending] cols items `nodeKey` "testKey"
+        handleEvent _wenv _node () () =
+          [scrollToRow (WidgetKey "testKey") scrollToRowCallback]
+        cmpNode =
+          compositeV_ "test" () (error "should not be called") buildUI handleEvent [onInit ()]
+        evts =
+          nodeHandleEventEvts wenv [] cmpNode
+    actualItems <- seq evts (takeMVar itemsMVar)
+    actualItems
+      `shouldBe` [ (TestItem (fixedSize 1), 2),
+                   (TestItem (fixedSize 2), 1),
+                   (TestItem (fixedSize 3), 0)
+                 ]
+
 testColumn :: Text -> (TestItem -> SizeReq) -> Column TestEvent TestItem
 testColumn name getHeight =
   (widgetColumn name (testCellWidget getHeight)) {paddingW = 0, paddingH = 0}
 
 -- | We test with custom widgets because these will create special "Hagrid.Cell" nodes in the widget
 -- tree that we can later use to pick out the cell widgets.
-testCellWidget :: (TestItem -> SizeReq) -> TestItem -> WidgetNode s TestEvent
-testCellWidget getHeight item = wgt
+testCellWidget :: (TestItem -> SizeReq) -> Int -> TestItem -> WidgetNode s TestEvent
+testCellWidget getHeight _idx item = wgt
   where
     wgt = label "test" `styleBasic` [sizeReqW reqW, sizeReqH reqH]
     reqW = fixedSize 100

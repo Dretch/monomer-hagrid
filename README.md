@@ -15,12 +15,13 @@ A datagrid widget for the [Monomer](https://github.com/fjvallarino/monomer) libr
 - Custom widgets for each cell, to override the standard label.
 - Custom width/height padding for each cell, configured per column.
 - Can scroll to a particular row when sent a message.
+- Can add footer widgets to the bottom of each column.
 
 ## Goals
 - Have complete and helpful documentation.
 - Be reasonably configurable and inspectable.
 - Be no uglier than standard Monomer widgets.
-- Be performant with ten thousand rows (but not with ten million).
+- Be performant with up to ten thousand rows.
 - Have some tests.
 
 ## Todo List

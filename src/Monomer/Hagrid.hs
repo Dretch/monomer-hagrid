@@ -13,6 +13,7 @@ module Monomer.Hagrid
     Column (..),
     ColumnAlign (..),
     ColumnWidget (..),
+    ColumnFooterWidget (..),
     ColumnSortKey (..),
     SortDirection (..),
     ScrollToRowCallback,
@@ -87,6 +88,8 @@ data Column e a = Column
     name :: Text,
     -- | Creates the widget for each cell in the column.
     widget :: ColumnWidget e a,
+    -- | Creates the widget for the column footer, if any.
+    footerWidget :: ColumnFooterWidget e a,
     -- | How to align the widget within each cell in the column.
     align :: ColumnAlign,
     -- | Determines if and how the column can be sorted by clicking the column header.
@@ -108,10 +111,20 @@ data Column e a = Column
 
 -- | How to create the widget that displays each cell in a column.
 data ColumnWidget e a
-  = -- | Create a label widget.
-    LabelWidget (a -> Text)
-  | -- | Create a widget of arbitrary type.
-    CustomWidget (forall s. WidgetModel s => a -> WidgetNode s e)
+  = -- | Create a label widget.. The function receives the original item index (i.e.
+    -- not the index in the sorted list) and the item itself.
+    LabelWidget (Int -> a -> Text)
+  | -- | Create a widget of arbitrary type. The function receives the original item
+    -- index (i.e. not the index in the sorted list) and the item itself.
+    CustomWidget (forall s. WidgetModel s => Int -> a -> WidgetNode s e)
+
+-- | How to create the footer widget for a column.
+data ColumnFooterWidget e a
+  = -- | No footer widget for this column.
+    NoFooterWidget
+  | -- | Create a footer widget. The function receives the items in their current sort
+    -- order, and also along with each item it's original (unsorted) index.
+    CustomFooterWidget (forall s. WidgetModel s => [(a, Int)] -> WidgetNode s e)
 
 -- | How to align the widget within each cell of a column.
 data ColumnAlign
@@ -150,7 +163,7 @@ data HagridEvent ep
   | ParentEvent ep
 
 data HagridModel a = HagridModel
-  { sortedItems :: [a],
+  { sortedItems :: [(a, Int)], -- each item, plus its index in the original (unsorted) list
     columns :: [ModelColumn],
     sortColumn :: Maybe (Int, SortDirection)
   }
@@ -162,12 +175,14 @@ data ModelColumn = ModelColumn
   }
   deriving (Eq, Show)
 
-data HeaderPaneState = HeaderPaneState
+-- | The state of the header or footer, which have a scroll offset because they
+-- scroll horizontally along with the content pane.
+data OffsetXState = OffsetXState
   { offsetX :: Double
   }
   deriving (Eq, Show)
 
-data HeaderPaneEvent = ScrollHeaderPaneTo Double
+data OffsetXEvent = SetOffsetX Double
 
 data HeaderDragHandleState = HeaderDragHandleState
   { dragStartMouseX :: Double,
@@ -207,28 +222,30 @@ hagrid_ cfg columnDefs items = widget
       compositeD_
         "Hagrid.Root"
         (WidgetValue (initialModel cfg columnDefs items))
-        (buildUI items)
+        buildUI
         handleEvent
         [compositeMergeModel mergeModel]
 
-    buildUI :: [a] -> UIBuilder (HagridModel a) (HagridEvent e)
-    buildUI items _wenv model = tree
+    buildUI :: UIBuilder (HagridModel a) (HagridEvent e)
+    buildUI _wenv model = tree
       where
         tree =
           vstack
             [ headerPane columnDefs model `nodeKey` headerPaneKey,
-              contentScroll `nodeKey` contentScrollKey
+              contentScroll `nodeKey` contentScrollKey,
+              footerPane columnDefs model `nodeKey` footerPaneKey
             ]
         contentScroll =
           scroll_ [onChange ContentScrollChange] $
-            contentPane columnDefs items model `nodeKey` contentPaneKey
+            contentPane columnDefs model `nodeKey` contentPaneKey
 
     handleEvent :: EventHandler (HagridModel a) (HagridEvent e) sp e
     handleEvent wenv _node model = \case
       ScrollToRow row ->
         [Message (WidgetKey contentPaneKey) (ContentPaneScrollToRow row)]
       ContentScrollChange ScrollStatus {scrollDeltaX} ->
-        [ Message (WidgetKey headerPaneKey) (ScrollHeaderPaneTo scrollDeltaX)
+        [ Message (WidgetKey headerPaneKey) (SetOffsetX scrollDeltaX),
+          Message (WidgetKey footerPaneKey) (SetOffsetX scrollDeltaX)
         ]
       OrderByColumn colIndex -> result
         where
@@ -251,6 +268,7 @@ hagrid_ cfg columnDefs items = widget
       ResizeColumn colIndex newWidth ->
         [ Model (model {columns = modifyAt colIndex (\c -> c {currentWidth = newWidth}) model.columns}),
           Request (ResizeWidgets headerPaneId),
+          Request (ResizeWidgets footerPaneId),
           Request (ResizeWidgets contentPaneId)
         ]
       ResizeColumnFinished colIndex -> result
@@ -263,6 +281,7 @@ hagrid_ cfg columnDefs items = widget
         [Report e]
       where
         headerPaneId = fromJust (widgetIdFromKey wenv (WidgetKey headerPaneKey))
+        footerPaneId = fromJust (widgetIdFromKey wenv (WidgetKey footerPaneKey))
         contentPaneId = fromJust (widgetIdFromKey wenv (WidgetKey contentPaneKey))
 
     -- If the column names have not changed then preseve the column widths and sort
@@ -302,9 +321,9 @@ accentColor wenv = transColor
     transColor = color {_colorA = 0.7}
 
 headerPane :: forall s ep a. WidgetEvent ep => [Column ep a] -> HagridModel a -> WidgetNode s (HagridEvent ep)
-headerPane columnDefs model = makeNode (HeaderPaneState 0)
+headerPane columnDefs model = makeNode (OffsetXState 0)
   where
-    makeNode :: HeaderPaneState -> WidgetNode s (HagridEvent ep)
+    makeNode :: OffsetXState -> WidgetNode s (HagridEvent ep)
     makeNode state = node
       where
         node =
@@ -319,7 +338,7 @@ headerPane columnDefs model = makeNode (HeaderPaneState 0)
             btn = headerButton i columnDef
             handle = headerDragHandle i columnDef column
 
-    makeWidget :: HeaderPaneState -> Widget s (HagridEvent ep)
+    makeWidget :: OffsetXState -> Widget s (HagridEvent ep)
     makeWidget state = container
       where
         container =
@@ -352,17 +371,16 @@ headerPane columnDefs model = makeNode (HeaderPaneState 0)
         handleMessage :: ContainerMessageHandler s (HagridEvent ep)
         handleMessage _wenv node _target msg = result
           where
-            handleTypedMessage (ScrollHeaderPaneTo offsetX)
+            handleTypedMessage (SetOffsetX offsetX)
               | offsetX == state.offsetX = Nothing
               | otherwise =
-                  Just $
-                    resultNode $
-                      node & L.widget .~ makeWidget state {offsetX}
+                  Just . resultNode $
+                    node & L.widget .~ makeWidget state {offsetX}
             result = cast msg >>= handleTypedMessage
 
         getSizeReq _wenv _node _children = (w, h)
           where
-            w = fixedSize (sum (fromIntegral . currentWidth <$> model.columns) + 100)
+            w = fixedSize (sum (fromIntegral . currentWidth <$> model.columns) + hScrollFudgeFactor)
             h = fixedSize dragHandleHeight
 
         resize _wenv node viewport _children = (resultNode node, assignedAreas)
@@ -373,7 +391,7 @@ headerPane columnDefs model = makeNode (HeaderPaneState 0)
               [w - dragHandleWidth, dragHandleWidth]
             (assignedAreas, _) = foldl' assignArea (mempty, l) widgetWidths
             assignArea (areas, colX) columnWidth =
-              (areas S.:|> Rect colX t (fromIntegral columnWidth) h, colX + fromIntegral columnWidth)
+              (areas :|> Rect colX t (fromIntegral columnWidth) h, colX + fromIntegral columnWidth)
 
         renderAfter wenv node renderer =
           forM_ model.sortColumn (renderSortIndicator wenv node renderer)
@@ -397,6 +415,72 @@ headerButton :: WidgetEvent ep => Int -> Column ep a -> WidgetNode s (HagridEven
 headerButton colIndex columnDef =
   button_ columnDef.name (OrderByColumn colIndex) [ellipsis]
     `styleBasic` [radius 0]
+
+footerPane :: forall s ep a. (CompositeModel a, CompositeModel s, Typeable ep) => [Column ep a] -> HagridModel a -> WidgetNode (HagridModel s) (HagridEvent ep)
+footerPane columnDefs model = makeNode (OffsetXState 0)
+  where
+    makeNode :: OffsetXState -> WidgetNode (HagridModel s) (HagridEvent ep)
+    makeNode state = node
+      where
+        node =
+          defaultWidgetNode "Hagrid.FooterPane" (makeWidget state)
+            & L.children .~ childWidgets
+
+    childWidgets :: Seq (WidgetNode (HagridModel s) (HagridEvent ep))
+    childWidgets =
+      S.fromList $
+        footerWidgetNode model.sortedItems . footerWidget <$> columnDefs
+
+    makeWidget :: OffsetXState -> Widget (HagridModel s) (HagridEvent ep)
+    makeWidget state = container
+      where
+        container =
+          createContainer
+            state
+            def
+              { containerChildrenOffset = Just (Point state.offsetX 0),
+                containerUpdateCWenv = updateCWenv,
+                containerMerge = merge,
+                containerHandleMessage = handleMessage,
+                containerGetSizeReq = getSizeReq,
+                containerResize = resize
+              }
+
+        -- needed to ensure child widgets don't disappear when scrolling
+        updateCWenv wenv node _cnode _cidx = newWenv
+          where
+            style = currentStyle wenv node
+            carea = getContentArea node style
+            newWenv =
+              wenv
+                & L.viewport .~ moveRect (Point (-state.offsetX) 0) carea
+
+        -- keep the scroll offset from the old node
+        merge _wenv node _oldNode oldState = resultNode newNode
+          where
+            newNode = node & L.widget .~ makeWidget oldState
+
+        handleMessage :: ContainerMessageHandler (HagridModel s) (HagridEvent ep)
+        handleMessage _wenv node _target msg = result
+          where
+            handleTypedMessage (SetOffsetX offsetX)
+              | offsetX == state.offsetX = Nothing
+              | otherwise =
+                  Just . resultNode $
+                    node & L.widget .~ makeWidget state {offsetX}
+            result = cast msg >>= handleTypedMessage
+
+        getSizeReq _wenv _node children = (w, h)
+          where
+            w = fixedSize (sum (fromIntegral . currentWidth <$> model.columns) + hScrollFudgeFactor)
+            h = foldl' sizeReqMergeMax (fixedSize 0) ((_wniSizeReqH . _wnInfo) <$> children)
+
+        resize _wenv node viewport _children = (resultNode node, assignedAreas)
+          where
+            Rect l t _w h = viewport
+            (assignedAreas, _) = foldl' assignArea (mempty, l) model.columns
+            assignArea (areas, colX) ModelColumn {currentWidth} =
+              (areas :|> Rect colX t (fromIntegral currentWidth) h, colX + fromIntegral currentWidth)
 
 headerDragHandle :: WidgetEvent ep => Int -> Column ep a -> ModelColumn -> WidgetNode s (HagridEvent ep)
 headerDragHandle colIndex columnDef column = tree
@@ -457,21 +541,26 @@ headerDragHandle colIndex columnDef column = tree
           where
             vp = node ^. L.info . L.viewport
 
+-- | This needs to be at least as big as the width of a vertical scrollbar.
+hScrollFudgeFactor :: Double
+hScrollFudgeFactor = 100
+
 contentPane ::
   forall a ep.
   (CompositeModel a, WidgetEvent ep) =>
   [Column ep a] ->
-  [a] ->
   HagridModel a ->
   WidgetNode (HagridModel a) (HagridEvent ep)
-contentPane columnDefs items model = node
+contentPane columnDefs model = node
   where
     node =
       defaultWidgetNode "Hagrid.ContentPane" contentPaneContainer
         & L.children .~ S.fromList (mconcat childWidgetRows)
 
     childWidgetRows =
-      [[cellWidget item widget | Column {widget} <- columnDefs] | item <- model.sortedItems]
+      [ [cellWidget idx item widget | Column {widget} <- columnDefs]
+        | (item, idx) <- model.sortedItems
+      ]
 
     nCols = length columnDefs
     columnDefsSeq = S.fromList columnDefs
@@ -578,14 +667,11 @@ contentPane columnDefs items model = node
               | otherwise =
                   Nothing
 
-            indexedItems = case modelSortKey columnDefs model.sortColumn of
-              DontSort ->
-                zip items [0 ..]
-              SortWith f ->
-                List.sortOn (f . snd) (indexed items)
-                  & indexed
-                  & List.sortOn (fst . snd)
-                  & map (\(sortedIndex, (_, item)) -> (item, sortedIndex))
+            indexedItems =
+              model.sortedItems
+                & indexed
+                & List.sortOn (snd . snd)
+                & map (\(sortedIndex, (item, _originalIndex)) -> (item, sortedIndex))
 
             vp = node ^. L.info . L.viewport
             rowYs = sizesToPositions (toRowHeights (node ^. L.children) columnDefsSeq)
@@ -597,7 +683,7 @@ initialModel cfg columnDefs items = model
   where
     model =
       HagridModel
-        { sortedItems = sortItems columnDefs sortColumn items,
+        { sortedItems = sortItems columnDefs sortColumn (zip items [0 ..]),
           columns = initialColumn <$> columnDefs,
           sortColumn
         }
@@ -630,10 +716,14 @@ contentScrollKey = "Hagrid.contentScroll"
 contentPaneKey :: Text
 contentPaneKey = "Hagrid.contentPane"
 
-sortItems :: [Column ep a] -> Maybe (Int, SortDirection) -> [a] -> [a]
-sortItems columnDefs sortColumn items = case modelSortKey columnDefs sortColumn of
-  DontSort -> items
-  SortWith f -> List.sortOn f items
+footerPaneKey :: Text
+footerPaneKey = "Hagrid.footerPane"
+
+sortItems :: [Column ep a] -> Maybe (Int, SortDirection) -> [(a, Int)] -> [(a, Int)]
+sortItems columnDefs sortColumn items =
+  case modelSortKey columnDefs sortColumn of
+    DontSort -> items
+    SortWith f -> List.sortOn (f . fst) items
 
 modelSortKey :: [Column ep a] -> Maybe (Int, SortDirection) -> ColumnSortKey a
 modelSortKey columnDefs sortColumn = case sortColumn of
@@ -675,7 +765,7 @@ textColumn ::
   Column e a
 textColumn name get = (defaultColumn name widget) {sortKey}
   where
-    widget = LabelWidget get
+    widget = LabelWidget (const get)
     sortKey = SortWith get
 
 -- | Creates a column that displays the result of calling @'show'@ on a value, and is sortable by the value.
@@ -688,15 +778,16 @@ showOrdColumn ::
   Column e a
 showOrdColumn name get = (defaultColumn name widget) {sortKey}
   where
-    widget = LabelWidget (T.pack . show . get)
+    widget = LabelWidget (const (T.pack . show . get))
     sortKey = SortWith get
 
 -- | Creates a column that displays the a custom widget in each cell.
 widgetColumn ::
   -- | Name of the column, to display in the header.
   Text ->
-  -- | Called with the item for each row to get the widget to display for that row.
-  (forall s. a -> WidgetNode s e) ->
+  -- | Called with the (original, not sorted) index and the item for each row to get the widget to
+  -- display for that row.
+  (forall s. Int -> a -> WidgetNode s e) ->
   Column e a
 widgetColumn name get = defaultColumn name (CustomWidget get)
 
@@ -705,6 +796,7 @@ defaultColumn name widget =
   Column
     { name,
       widget,
+      footerWidget = NoFooterWidget,
       align = ColumnAlignLeft,
       initialWidth = defaultColumnInitialWidth,
       sortKey = DontSort,
@@ -715,15 +807,31 @@ defaultColumn name widget =
       sortHandler = Nothing
     }
 
-cellWidget :: (CompositeModel a, WidgetEvent e, WidgetModel s) => a -> ColumnWidget e a -> WidgetNode (HagridModel s) (HagridEvent e)
-cellWidget item = \case
-  LabelWidget get -> label_ (get item) [ellipsis]
+cellWidget :: (CompositeModel a, WidgetEvent e, WidgetModel s) => Int -> a -> ColumnWidget e a -> WidgetNode (HagridModel s) (HagridEvent e)
+cellWidget idx item = \case
+  LabelWidget get -> label_ (get idx item) [ellipsis]
   CustomWidget get -> widget
     where
       widget =
         compositeD_ "Hagrid.Cell" (WidgetValue item) buildUI handleEvent []
       buildUI _wenv model =
-        get model
+        get idx model
+      handleEvent _wenv _node _model e =
+        [Report (ParentEvent e)]
+
+footerWidgetNode ::
+  (CompositeModel a, CompositeModel s, Typeable e) =>
+  [(a, Int)] ->
+  ColumnFooterWidget e a ->
+  WidgetNode (HagridModel s) (HagridEvent e)
+footerWidgetNode items = \case
+  NoFooterWidget -> spacer
+  CustomFooterWidget get -> widget
+    where
+      widget =
+        compositeD_ "Hagrid.FooterCell" (WidgetValue items) buildUI handleEvent []
+      buildUI _wenv _model =
+        get items
       handleEvent _wenv _node _model e =
         [Report (ParentEvent e)]
 
