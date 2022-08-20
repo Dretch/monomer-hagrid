@@ -54,7 +54,7 @@ main = startApp model handleEvent buildUI config
         appFontDef "Bold" "./assets/fonts/Cantarell/Cantarell-Bold.ttf",
         appFontDef "Regular" "./assets/fonts/Cantarell/Cantarell-Regular.ttf",
         appDisableAutoScale True,
-        appWindowState (MainWindowNormal (1400, 1000))
+        appWindowState (MainWindowNormal (1200, 1000))
       ]
     model =
       AppModel
