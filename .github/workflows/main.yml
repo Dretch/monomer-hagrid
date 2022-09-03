@@ -16,7 +16,7 @@ jobs:
       with:
         stack-setup-ghc: true
         enable-stack: true
-    - run: stack build --dry-run
+      run: stack build --dry-run
 
     - name: 'Check formatting'
       uses: mrkkrp/ormolu-action@v6
