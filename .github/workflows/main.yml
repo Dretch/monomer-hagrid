@@ -3,7 +3,7 @@ name: CI
 on: [push]
 
 jobs:
-  check-formatting:
+  check-formatting-and-metadata:
 
     runs-on: ubuntu-22.04
 
@@ -11,14 +11,18 @@ jobs:
 
     - uses: actions/checkout@v3
       
-    # regenerate the .cabal file so that Ormolu knows what GHC extensions we are using
-    - uses: haskell/actions/setup@v2
+    - name: 'Regenerate the .cabal file so that Ormolu knows what GHC extensions we are using'
+      uses: haskell/actions/setup@v2
       with:
         stack-setup-ghc: true
         enable-stack: true
     - run: stack build --dry-run
 
-    - uses: mrkkrp/ormolu-action@v6
+    - name: 'Check formatting'
+      uses: mrkkrp/ormolu-action@v6
+
+    - name: 'Check package metadata'
+      run: cabal check
 
   build:
 
