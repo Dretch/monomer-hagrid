@@ -55,3 +55,29 @@ jobs:
     
     - name: 'Build and test'
       run: stack test
+
+  package:
+
+    needs: [check-formatting-and-metadata, build]
+
+    runs-on: ubuntu-22.04
+
+    steps:
+
+    - uses: actions/checkout@v3
+      
+    - name: 'Install Stack'
+      uses: haskell/actions/setup@v2
+      with:
+        stack-setup-ghc: true
+        enable-stack: true
+    
+    - name: 'Generate package'
+      run: stack sdist
+
+    - name: 'Archive package'
+      uses: actions/upload-artifact@v3
+      with:
+        name: package
+        path: stack-work/dist/*/*/monomer-hagrid-*.tar.gz
+
