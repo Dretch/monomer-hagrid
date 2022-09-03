@@ -80,4 +80,5 @@ jobs:
       with:
         name: package
         path: .stack-work/dist/*/*/monomer-hagrid-*.tar.gz
+        if-no-files-found: error
 
