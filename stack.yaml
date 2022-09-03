@@ -72,3 +72,6 @@ flags:
 #
 # Allow a newer minor version of GHC than the snapshot specifies
 # compiler-check: newer-minor
+
+# Generate package version bounds to make hackage happy, see: https://www.fpcomplete.com/blog/2015/09/stack-pvp/
+pvp-bounds: both
