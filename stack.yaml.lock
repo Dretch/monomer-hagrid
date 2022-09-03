@@ -16,16 +16,12 @@ packages:
     git: https://github.com/fjvallarino/monomer
     commit: d080022da50b50959c83c8e3d6953eeda3804b53
 - completed:
-    name: sdl2
-    version: 2.5.3.2
-    git: https://github.com/haskell-game/sdl2
+    hackage: sdl2-2.5.3.3@sha256:4b385d5c1dc662c082ebbd838833185da84cbd00f40d06018d066fd01c405322,11676
     pantry-tree:
-      size: 7086
-      sha256: 62403665bb98fbf4a25b9e9b117bab709534f3c9a919da6dbf78c99764fa33fe
-    commit: b4fe21c1025e4be9a1eb03c19f811e1776a2b292
+      size: 6573
+      sha256: 3c2f086598c13239ef5f1e933af02ecf3dd9d72f92cd74b5012924ccdf46909e
   original:
-    git: https://github.com/haskell-game/sdl2
-    commit: b4fe21c1025e4be9a1eb03c19f811e1776a2b292
+    hackage: sdl2-2.5.3.3
 snapshots:
 - completed:
     size: 590824
