@@ -299,7 +299,7 @@ hagrid_ cfg columnDefs items = widget
           | otherwise =
               newModel
         columnNames m =
-          (.name) <$> columns m
+          (.name) <$> m.columns
 
 drawSortIndicator :: Renderer -> Rect -> Maybe Color -> SortDirection -> IO ()
 drawSortIndicator renderer rect color dir = drawCmd
