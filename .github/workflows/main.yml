@@ -17,9 +17,6 @@ jobs:
         stack-setup-ghc: true
         enable-stack: true
 
-    - name: 'Regenerate the .cabal file so that Ormolu knows what GHC extensions we are using'
-      run: stack build --dry-run
-
     - name: 'Check formatting'
       uses: mrkkrp/ormolu-action@v6
 
