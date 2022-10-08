@@ -9,22 +9,15 @@ packages:
     version: 1.4.1.0
     git: https://github.com/fjvallarino/monomer
     pantry-tree:
-      size: 17331
-      sha256: f7e6421c0d319aae142f8cd315db5582bbc2892f29f57bd2eb3875578019f2cd
-    commit: d080022da50b50959c83c8e3d6953eeda3804b53
+      size: 17680
+      sha256: 61846448df4a4ef80ead548e346bdf6179b41cf84dd7b1657e1c6fae8d455c5b
+    commit: 38391f7bfc37860c4be17bdf01bd8e6d24738c45
   original:
     git: https://github.com/fjvallarino/monomer
-    commit: d080022da50b50959c83c8e3d6953eeda3804b53
-- completed:
-    hackage: sdl2-2.5.3.3@sha256:4b385d5c1dc662c082ebbd838833185da84cbd00f40d06018d066fd01c405322,11676
-    pantry-tree:
-      size: 6573
-      sha256: 3c2f086598c13239ef5f1e933af02ecf3dd9d72f92cd74b5012924ccdf46909e
-  original:
-    hackage: sdl2-2.5.3.3
+    commit: 38391f7bfc37860c4be17bdf01bd8e6d24738c45
 snapshots:
 - completed:
-    size: 590824
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2022/5/28.yaml
-    sha256: 1b1fbecac3fc9c8efb60b85fd7ce635c8278d0080a66c2ba0d6e4c03773f5f64
-  original: nightly-2022-05-28
+    size: 643197
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2022/10/5.yaml
+    sha256: aa6c5e469d7b28832c3b80cd2ca9fd6ea084ba7e4efc3f225757867e25bdbcef
+  original: nightly-2022-10-05
