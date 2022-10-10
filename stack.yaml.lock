@@ -5,16 +5,12 @@
 
 packages:
 - completed:
-    name: monomer
-    version: 1.4.1.0
-    git: https://github.com/fjvallarino/monomer
+    hackage: monomer-1.5.0.0@sha256:4240bdb2639a375f68517052a28ba11f377badb1e152e41a8c09d503e2c2e92d,15255
     pantry-tree:
-      size: 17680
-      sha256: 61846448df4a4ef80ead548e346bdf6179b41cf84dd7b1657e1c6fae8d455c5b
-    commit: 38391f7bfc37860c4be17bdf01bd8e6d24738c45
+      size: 14368
+      sha256: 786595e425c920a972e0d2c83ab7fcd8f2642e2c43262be737d27b5ae4c376df
   original:
-    git: https://github.com/fjvallarino/monomer
-    commit: 38391f7bfc37860c4be17bdf01bd8e6d24738c45
+    hackage: monomer-1.5.0.0
 snapshots:
 - completed:
     size: 643197
