@@ -9,6 +9,10 @@ license:             MIT
 category:            GUI
 maintainer:          garethdanielsmith@gmail.com
 
+extra-source-files:
+- README.md
+- ChangeLog.md
+
 dependencies:
 - base >= 4.7 && < 5
 - containers
