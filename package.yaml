@@ -5,7 +5,7 @@ description:         A configurable Monomer widget that shows a scrollable grid 
 github:              Dretch/monomer-hagrid
 homepage:            https://github.com/Dretch/monomer-hagrid#readme
 bug-reports:         https://github.com/Dretch/monomer-hagrid/issues
-license:             WTFPL
+license:             MIT
 category:            GUI
 maintainer:          garethdanielsmith@gmail.com
 
