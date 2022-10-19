@@ -28,6 +28,10 @@ A datagrid widget for the [Monomer](https://github.com/fjvallarino/monomer) libr
 - Improve performance with lots of rows (e.g. 1000).
 - Explore providing an API where current sort/column widths/etc are stored in the parent model and updated by hagrid via a lens. This may remove some complexity around merging and the specification of initial sorts/column widths.
 
+## API Documentation
+
+See the generated docs on [Hackage](https://hackage.haskell.org/package/monomer-hagrid).
+
 ## To build and run examples
 ```bash
 stack run
