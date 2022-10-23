@@ -3,7 +3,6 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 
 -- | A datagrid widget for the Monomer UI library.
@@ -59,7 +58,7 @@ import Monomer.Widgets.Container
 import Monomer.Widgets.Single
 
 -- | Configuration options for Hagrid widgets.
-data HagridCfg s e = HagridCfg
+newtype HagridCfg s e = HagridCfg
   { cfgInitialSort :: Maybe (Int, SortDirection)
   }
 
@@ -177,12 +176,12 @@ data ModelColumn = ModelColumn
 
 -- | The state of the header or footer, which have a scroll offset because they
 -- scroll horizontally along with the content pane.
-data OffsetXState = OffsetXState
+newtype OffsetXState = OffsetXState
   { offsetX :: Double
   }
   deriving (Eq, Show)
 
-data OffsetXEvent = SetOffsetX Double
+newtype OffsetXEvent = SetOffsetX Double
 
 data HeaderDragHandleState = HeaderDragHandleState
   { dragStartMouseX :: Double,
@@ -190,7 +189,7 @@ data HeaderDragHandleState = HeaderDragHandleState
   }
   deriving (Eq, Show)
 
-data ContentPaneMessage a
+newtype ContentPaneMessage a
   = ContentPaneScrollToRow (ScrollToRowCallback a)
 
 -- | Creates a hagrid widget, using the default configuration.
@@ -473,7 +472,7 @@ footerPane columnDefs model = makeNode (OffsetXState 0)
         getSizeReq _wenv _node children = (w, h)
           where
             w = fixedSize (sum (fromIntegral . currentWidth <$> model.columns) + hScrollFudgeFactor)
-            h = foldl' sizeReqMergeMax (fixedSize 0) ((_wniSizeReqH . _wnInfo) <$> children)
+            h = foldl' sizeReqMergeMax (fixedSize 0) (_wniSizeReqH . _wnInfo <$> children)
 
         resize _wenv node viewport _children = (resultNode node, assignedAreas)
           where
@@ -591,7 +590,7 @@ contentPane columnDefs model = node
 
         assignedAreas = do
           (rowN, row) <-
-            S.mapWithIndex (\i -> (i,)) (S.chunksOf nCols children)
+            S.mapWithIndex (,) (S.chunksOf nCols children)
           (colN, columnDef, widget) <-
             S.mapWithIndex (\i (cd, w) -> (i, cd, w)) (S.zip columnDefsSeq row)
           pure (assignArea colN columnDef rowN widget)
@@ -814,8 +813,8 @@ cellWidget idx item = \case
     where
       widget =
         compositeD_ "Hagrid.Cell" (WidgetValue item) buildUI handleEvent []
-      buildUI _wenv model =
-        get idx model
+      buildUI _wenv =
+        get idx
       handleEvent _wenv _node _model e =
         [Report (ParentEvent e)]
 
