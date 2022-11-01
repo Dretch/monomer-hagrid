@@ -34,7 +34,8 @@ See the generated docs on [Hackage](https://hackage.haskell.org/package/monomer-
 
 ## To build and run examples
 ```bash
-stack run
+stack run example-basic
+stack run example-big-grid
 ```
 
 ## Contribution Guide

@@ -1,6 +1,6 @@
 cabal-version: 2.0
 
--- This file has been generated from package.yaml by hpack version 0.34.4.
+-- This file has been generated from package.yaml by hpack version 0.35.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -49,19 +49,21 @@ library
     , text
   default-language: Haskell2010
 
-executable examples
+executable example-basic
   main-is: Main.hs
   other-modules:
       Paths_monomer_hagrid
+  autogen-modules:
+      Paths_monomer_hagrid
   hs-source-dirs:
-      examples
+      example-basic
   default-extensions:
       DisambiguateRecordFields
       DuplicateRecordFields
       FlexibleContexts
       OverloadedRecordDot
       OverloadedStrings
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints
+  ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
     , containers
@@ -74,12 +76,40 @@ executable examples
     , time
   default-language: Haskell2010
 
+executable example-big-grid
+  main-is: Main.hs
+  other-modules:
+      Paths_monomer_hagrid
+  autogen-modules:
+      Paths_monomer_hagrid
+  hs-source-dirs:
+      example-big-grid
+  default-extensions:
+      DisambiguateRecordFields
+      DuplicateRecordFields
+      FlexibleContexts
+      OverloadedRecordDot
+      OverloadedStrings
+  ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , containers
+    , data-default-class
+    , ilist
+    , lens
+    , monomer
+    , monomer-hagrid
+    , text
+  default-language: Haskell2010
+
 test-suite spec
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
       Monomer.HagridSpec
       Monomer.TestUtil
+      Paths_monomer_hagrid
+  autogen-modules:
       Paths_monomer_hagrid
   hs-source-dirs:
       test
@@ -89,7 +119,7 @@ test-suite spec
       FlexibleContexts
       OverloadedRecordDot
       OverloadedStrings
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints
+  ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
     , bytestring

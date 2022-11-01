@@ -50,7 +50,7 @@ main :: IO ()
 main = startApp model handleEvent buildUI config
   where
     config =
-      [ appWindowTitle "Hagrid Examples",
+      [ appWindowTitle "Hagrid Basic Example",
         appFontDef "Bold" "./assets/fonts/Cantarell/Cantarell-Bold.ttf",
         appFontDef "Regular" "./assets/fonts/Cantarell/Cantarell-Regular.ttf",
         appDisableAutoScale True,
