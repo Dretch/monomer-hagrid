@@ -15,6 +15,7 @@ module Monomer.Hagrid
     ColumnFooterWidget (..),
     ColumnSortKey (..),
     SortDirection (..),
+    ItemWithIndex,
     ScrollToRowCallback,
 
     -- * Configuration options
@@ -123,7 +124,7 @@ data ColumnFooterWidget e a
     NoFooterWidget
   | -- | Create a footer widget. The function receives the items in their current sort
     -- order, and also along with each item it's original (unsorted) index.
-    CustomFooterWidget (forall s. WidgetModel s => [(a, Int)] -> WidgetNode s e)
+    CustomFooterWidget (forall s. WidgetModel s => [ItemWithIndex a] -> WidgetNode s e)
 
 -- | How to align the widget within each cell of a column.
 data ColumnAlign
@@ -144,11 +145,14 @@ data SortDirection
   | SortDescending
   deriving (Eq, Show)
 
+-- | A item in the grid, with its row index.
+type ItemWithIndex a = (a, Int)
+
 -- | Picks an item to scroll to, based on the sorted or original grid contents.
 type ScrollToRowCallback a =
   -- | The items in the grid, in the originally provided order, along with each item's index
   -- in the current grid order.
-  [(a, Int)] ->
+  [ItemWithIndex a] ->
   -- | The row to scroll to, as an index into the sorted items (e.g. 0 is always the first row
   -- in the grid, regardless of the current order). 'Nothing' will cancel the scroll.
   Maybe Int
@@ -162,7 +166,7 @@ data HagridEvent ep
   | ParentEvent ep
 
 data HagridModel a = HagridModel
-  { sortedItems :: [(a, Int)], -- each item, plus its index in the original (unsorted) list
+  { sortedItems :: [ItemWithIndex a],
     columns :: [ModelColumn],
     sortColumn :: Maybe (Int, SortDirection)
   }
@@ -718,7 +722,11 @@ contentPaneKey = "Hagrid.contentPane"
 footerPaneKey :: Text
 footerPaneKey = "Hagrid.footerPane"
 
-sortItems :: [Column ep a] -> Maybe (Int, SortDirection) -> [(a, Int)] -> [(a, Int)]
+sortItems ::
+  [Column ep a] ->
+  Maybe (Int, SortDirection) ->
+  [ItemWithIndex a] ->
+  [ItemWithIndex a]
 sortItems columnDefs sortColumn items =
   case modelSortKey columnDefs sortColumn of
     DontSort -> items
@@ -820,7 +828,7 @@ cellWidget idx item = \case
 
 footerWidgetNode ::
   (CompositeModel a, CompositeModel s, Typeable e) =>
-  [(a, Int)] ->
+  [ItemWithIndex a] ->
   ColumnFooterWidget e a ->
   WidgetNode (HagridModel s) (HagridEvent e)
 footerWidgetNode items = \case
