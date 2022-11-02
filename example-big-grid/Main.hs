@@ -19,7 +19,7 @@ data AppEvent
 
 main :: IO ()
 main = do
-  bookLines <- lines <$> readFile "./assets/etc/roughing-it.txt"
+  bookLines <- lines <$> readFile "./assets/etc/the-oregon-trail.txt"
   startApp (model bookLines) handleEvent buildUI config
   where
     config =
@@ -40,10 +40,10 @@ buildUI _wenv model = tree
   where
     tree =
       hagrid
-        [ (textColumn "Author" (const "Mark Twain")) {initialWidth = 140},
-          (textColumn "Title" (const "Roughing It")) {initialWidth = 140},
+        [ (textColumn "Author" (const "Francis Parkman, Jr.")) {initialWidth = 180},
+          (textColumn "Title" (const "The Oregon Trail")) {initialWidth = 160},
           widgetColumn "Line Index" (\i _ -> label (pack (show i))),
-          (textColumn "Line" id) {initialWidth = 800}
+          (textColumn "Line" id) {initialWidth = 760}
         ]
         model.bookLines
 
