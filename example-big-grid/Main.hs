@@ -4,14 +4,15 @@
 
 module Main (main) where
 
-import Data.Text (Text, lines, pack)
+import Data.Function ((&))
+import Data.Text (Text, dropWhile, dropWhileEnd, pack, splitOn, strip)
 import Data.Text.IO (readFile)
 import Monomer
 import Monomer.Hagrid (hagrid, initialWidth, textColumn, widgetColumn)
-import Prelude hiding (lines, readFile)
+import Prelude hiding (dropWhile, readFile)
 
 newtype AppModel = AppModel
-  { bookLines :: [Text]
+  { paragraphs :: [Text]
   }
   deriving (Eq, Show)
 
@@ -19,8 +20,8 @@ data AppEvent
 
 main :: IO ()
 main = do
-  bookLines <- lines <$> readFile "./assets/etc/the-oregon-trail.txt"
-  startApp (model bookLines) handleEvent buildUI config
+  paragraphs <- splitParagraphs <$> readFile "./assets/etc/war-and-peace.txt"
+  startApp (model paragraphs) handleEvent buildUI config
   where
     config =
       [ appWindowTitle "Hagrid Big Grid Example",
@@ -30,9 +31,9 @@ main = do
         appDisableAutoScale True,
         appWindowState (MainWindowNormal (1200, 1000))
       ]
-    model bookLines =
+    model paragraphs =
       AppModel
-        { bookLines
+        { paragraphs
         }
 
 buildUI :: UIBuilder AppModel AppEvent
@@ -40,12 +41,18 @@ buildUI _wenv model = tree
   where
     tree =
       hagrid
-        [ (textColumn "Author" (const "Francis Parkman, Jr.")) {initialWidth = 180},
-          (textColumn "Title" (const "The Oregon Trail")) {initialWidth = 160},
+        [ (textColumn "Author" (const "Leo Tolstoy")) {initialWidth = 180},
+          (textColumn "Title" (const "War and Peace")) {initialWidth = 160},
           widgetColumn "Line Index" (\i _ -> label (pack (show i))),
-          (textColumn "Line" id) {initialWidth = 760}
+          (widgetColumn "Line" (\_ para -> label_ para [multiline, ellipsis])) {initialWidth = 760}
         ]
-        model.bookLines
+        model.paragraphs
 
 handleEvent :: EventHandler AppModel AppEvent sp ep
 handleEvent _wenv _node _model = \case {}
+
+splitParagraphs :: Text -> [Text]
+splitParagraphs s =
+  splitOn "\n\n" s
+    & fmap (dropWhile (== '\n') . dropWhileEnd (== '\n'))
+    & filter ((/= mempty) . strip)
