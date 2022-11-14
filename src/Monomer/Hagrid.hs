@@ -45,7 +45,7 @@ import Data.Default.Class as X (Default, def)
 import Data.Foldable (foldl')
 import qualified Data.List as List
 import Data.List.Index (indexed, izipWith, modifyAt)
-import Data.Maybe (fromJust, maybeToList)
+import Data.Maybe (catMaybes, fromJust, isNothing, maybeToList)
 import Data.Maybe as X (fromMaybe)
 import Data.Ord (Down (Down))
 import Data.Sequence (Seq ((:<|), (:|>)))
@@ -419,7 +419,12 @@ headerButton colIndex columnDef =
   button_ columnDef.name (OrderByColumn colIndex) [ellipsis]
     `styleBasic` [radius 0]
 
-footerPane :: forall s ep a. (CompositeModel a, CompositeModel s, Typeable ep) => [Column ep a] -> HagridModel a -> WidgetNode (HagridModel s) (HagridEvent ep)
+footerPane ::
+  forall s ep a.
+  (CompositeModel a, CompositeModel s, Typeable ep) =>
+  [Column ep a] ->
+  HagridModel a ->
+  WidgetNode (HagridModel s) (HagridEvent ep)
 footerPane columnDefs model = makeNode (OffsetXState 0)
   where
     makeNode :: OffsetXState -> WidgetNode (HagridModel s) (HagridEvent ep)
@@ -427,12 +432,10 @@ footerPane columnDefs model = makeNode (OffsetXState 0)
       where
         node =
           defaultWidgetNode "Hagrid.FooterPane" (makeWidget state)
-            & L.children .~ childWidgets
+            & L.children .~ S.fromList (catMaybes childWidgets)
 
-    childWidgets :: Seq (WidgetNode (HagridModel s) (HagridEvent ep))
-    childWidgets =
-      S.fromList $
-        footerWidgetNode model.sortedItems . footerWidget <$> columnDefs
+    childWidgets :: [Maybe (WidgetNode (HagridModel s) (HagridEvent ep))]
+    childWidgets = footerWidgetNode model.sortedItems . footerWidget <$> columnDefs
 
     makeWidget :: OffsetXState -> Widget (HagridModel s) (HagridEvent ep)
     makeWidget state = container
@@ -481,9 +484,13 @@ footerPane columnDefs model = makeNode (OffsetXState 0)
         resize _wenv node viewport _children = (resultNode node, assignedAreas)
           where
             Rect l t _w h = viewport
-            (assignedAreas, _) = foldl' assignArea (mempty, l) model.columns
-            assignArea (areas, colX) ModelColumn {currentWidth} =
-              (areas :|> Rect colX t (fromIntegral currentWidth) h, colX + fromIntegral currentWidth)
+            (assignedAreas, _) = foldl' assignArea (mempty, l) (zip childWidgets model.columns)
+            assignArea (areas, colX) (childWidget, ModelColumn {currentWidth}) = (newAreas, newColX)
+              where
+                newAreas
+                  | isNothing childWidget = areas
+                  | otherwise = areas :|> Rect colX t (fromIntegral currentWidth) h
+                newColX = colX + fromIntegral currentWidth
 
 headerDragHandle :: WidgetEvent ep => Int -> Column ep a -> ModelColumn -> WidgetNode s (HagridEvent ep)
 headerDragHandle colIndex columnDef column = tree
@@ -830,10 +837,10 @@ footerWidgetNode ::
   (CompositeModel a, CompositeModel s, Typeable e) =>
   [ItemWithIndex a] ->
   ColumnFooterWidget e a ->
-  WidgetNode (HagridModel s) (HagridEvent e)
+  Maybe (WidgetNode (HagridModel s) (HagridEvent e))
 footerWidgetNode items = \case
-  NoFooterWidget -> spacer
-  CustomFooterWidget get -> widget
+  NoFooterWidget -> Nothing
+  CustomFooterWidget get -> Just widget
     where
       widget =
         compositeD_ "Hagrid.FooterCell" (WidgetValue items) buildUI handleEvent []

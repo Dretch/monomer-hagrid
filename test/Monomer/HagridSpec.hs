@@ -61,6 +61,14 @@ resize = describe "resize" $ do
       [TestItem (fixedSize 10 & L.flex .~ 7)]
       `shouldBe` [Rect 0 40 50 17]
 
+  it "should have zero-height footer when no footer widgets specified" $
+    viewports_
+      [(testColumn "Col 1" (const (fixedSize 33))) {initialWidth = 50}]
+      [TestItem (fixedSize 0)]
+      []
+      "Hagrid.FooterPane"
+      `shouldBe` [Rect 0 100 100 0]
+
 sorting :: Spec
 sorting = describe "sorting" $ do
   it "should not sort rows by default" $ do
@@ -160,13 +168,16 @@ cellViewports columnDefs items =
   cellViewports_ columnDefs items []
 
 cellViewports_ :: [Column TestEvent TestItem] -> [TestItem] -> [SystemEvent] -> [Rect]
-cellViewports_ columnDefs items evts = Foldable.toList childVps
+cellViewports_ columnDefs items evts = viewports_ columnDefs items evts "Hagrid.Cell"
+
+viewports_ :: [Column TestEvent TestItem] -> [TestItem] -> [SystemEvent] -> WidgetType -> [Rect]
+viewports_ columnDefs items evts wType = Foldable.toList childVps
   where
     startNode = nodeInit wenv (hagrid columnDefs items)
     ((wenv', eventedNode, _reqs), _) = nodeHandleEvents wenv WNoInit evts startNode
     resizedNode = nodeResize wenv' eventedNode (eventedNode ^. L.info . L.viewport)
     instanceTree = widgetGetInstanceTree (resizedNode ^. L.widget) wenv' resizedNode
-    childVps = roundRectUnits . _wniViewport . _winInfo <$> widgetsOfType "Hagrid.Cell" instanceTree
+    childVps = roundRectUnits . _wniViewport . _winInfo <$> widgetsOfType wType instanceTree
 
 -- Extract the column widths by observing the locations of the special drag handle widgets
 columnWidths :: WidgetNode TestModel TestEvent -> [Int]
