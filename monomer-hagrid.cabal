@@ -102,6 +102,33 @@ executable example-big-grid
     , text
   default-language: Haskell2010
 
+executable example-resizing-cells
+  main-is: Main.hs
+  other-modules:
+      Paths_monomer_hagrid
+  autogen-modules:
+      Paths_monomer_hagrid
+  hs-source-dirs:
+      example-resizing-cells
+  default-extensions:
+      DisambiguateRecordFields
+      DuplicateRecordFields
+      FlexibleContexts
+      OverloadedRecordDot
+      OverloadedStrings
+  ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , containers
+    , data-default-class
+    , ilist
+    , lens
+    , monomer
+    , monomer-hagrid
+    , random
+    , text
+  default-language: Haskell2010
+
 test-suite spec
   type: exitcode-stdio-1.0
   main-is: Spec.hs

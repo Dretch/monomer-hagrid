@@ -36,6 +36,7 @@ See the generated docs on [Hackage](https://hackage.haskell.org/package/monomer-
 ```bash
 stack run example-basic
 stack run example-big-grid
+stack run example-resizing-cells
 ```
 
 ## Contribution Guide
