@@ -41,7 +41,7 @@ import Control.Lens.Combinators (non)
 import Control.Lens.Lens ((&))
 import Control.Monad as X (forM_)
 import Data.Data (Typeable)
-import Data.Default.Class as X (Default, def)
+import Data.Default.Class (Default, def)
 import Data.Foldable (foldl')
 import qualified Data.List as List
 import Data.List.Index (indexed, izipWith, modifyAt)
