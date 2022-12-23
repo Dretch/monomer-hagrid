@@ -36,7 +36,7 @@ module Monomer.Hagrid
 where
 
 import Control.Applicative ((<|>))
-import Control.Lens ((.~), (<>~), (^.))
+import Control.Lens (ix, (.~), (<>~), (^.), (^?!))
 import Control.Lens.Combinators (non)
 import Control.Lens.Lens ((&))
 import Control.Monad as X (forM_)
@@ -390,8 +390,12 @@ headerPane columnDefs model = makeNode (OffsetXState 0)
           where
             Rect l t _w h = viewport
             widgetWidths = do
-              w <- currentWidth <$> model.columns
-              [w - dragHandleWidth, dragHandleWidth]
+              (i, w) <- indexed (currentWidth <$> model.columns)
+              -- center the drag handle inbetween the columns
+              let buttonW
+                    | i == 0 = w - (dragHandleWidth `div` 2)
+                    | otherwise = w - dragHandleWidth
+              [buttonW, dragHandleWidth]
             (assignedAreas, _) = foldl' assignArea (mempty, l) widgetWidths
             assignArea (areas, colX) columnWidth =
               (areas :|> Rect colX t (fromIntegral columnWidth) h, colX + fromIntegral columnWidth)
@@ -402,16 +406,19 @@ headerPane columnDefs model = makeNode (OffsetXState 0)
         renderSortIndicator wenv node renderer (sortCol, sortDirection) = do
           drawSortIndicator renderer indRect (Just (accentColor wenv)) sortDirection
           where
+            Rect l t w h = node ^?! L.children . ix (sortCol * 2) . L.info . L.viewport
+
             style = wenv ^. L.theme . L.basic . L.btnStyle
-            Rect l t _w h = node ^. L.info . L.viewport
             size = style ^. L.text . non def . L.fontSize . non def
-            colOffset = fromIntegral (sum (take (sortCol + 1) (currentWidth <$> model.columns)) - dragHandleWidth)
-            indW = unFontSize size * 2 / 3
-            pad = indW / 3
+
+            -- put triangle corners at integer positions because it looks nicer
+            indW = ceilingDouble (unFontSize size * 2 / 3)
+            pad = ceilingDouble (unFontSize size * 2 / 9)
+
             indT = case sortDirection of
               SortAscending -> t + h - pad - indW
               SortDescending -> t + pad
-            indL = l + state.offsetX + colOffset - indW - pad
+            indL = l + w + state.offsetX - indW - pad
             indRect = Rect indL indT indW indW
 
 headerButton :: WidgetEvent ep => Int -> Column ep a -> WidgetNode s (HagridEvent ep)
@@ -874,3 +881,6 @@ defaultColumnPadding = 10
 flipSortDirection :: SortDirection -> SortDirection
 flipSortDirection SortAscending = SortDescending
 flipSortDirection SortDescending = SortAscending
+
+ceilingDouble :: Double -> Double
+ceilingDouble x = fromIntegral (ceiling x :: Int)

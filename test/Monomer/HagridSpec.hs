@@ -184,7 +184,7 @@ columnWidths :: WidgetNode TestModel TestEvent -> [Int]
 columnWidths node = fromFractional <$> colWidths
   where
     (_, colWidths) =
-      Foldable.foldl' (\(px, cws) (Rect x _y w _h) -> (x + w, (x + w - px) : cws)) (0, []) vps
+      Foldable.foldl' (\(px, cws) (Rect x _y w _h) -> (x + w, (x + w / 2 - px) : cws)) (0, []) vps
     vps =
       _wniViewport . _winInfo <$> dragHandles
     dragHandles =
