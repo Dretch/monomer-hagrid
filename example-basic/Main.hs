@@ -7,7 +7,8 @@
 module Main (main) where
 
 import Control.Lens (Ixed (ix), makeLensesFor, singular)
-import Data.List.Index (setAt)
+import Data.Sequence (Seq ((:|>)))
+import qualified Data.Sequence as S
 import Data.Text (Text, pack)
 import qualified Data.Text as T
 import Data.Time (Day, addDays, defaultTimeLocale, formatTime, fromGregorian)
@@ -17,7 +18,7 @@ import Text.Printf (printf)
 
 data AppModel = AppModel
   { theme :: Theme,
-    spiders :: [Spider],
+    spiders :: Seq Spider,
     columns :: [AppColumn],
     rowToScrollTo :: Int
   }
@@ -35,7 +36,7 @@ data AppEvent
   | ScrollToOriginalIndex
 
 data Spider = Spider
-  { index :: Integer,
+  { index :: Int,
     species :: Text,
     name :: Text,
     dateOfBirth :: Day,
@@ -63,13 +64,13 @@ main = startApp model handleEvent buildUI config
           columns = AppColumn True <$ gridColumns,
           rowToScrollTo = 0
         }
-    spiders = spider <$> [0 .. numSpiders - 1]
+    spiders = S.fromFunction numSpiders spider
     spider i =
       Spider
         { index = i,
           species = "Acromantula",
           name = T.pack (printf "Son of Aragog %d" (i + 1)),
-          dateOfBirth = addDays i (fromGregorian 1942 3 1),
+          dateOfBirth = addDays (fromIntegral i) (fromGregorian 1942 3 1),
           weightKilos = fromIntegral (numSpiders + 2 - i) * 2.3
         }
     numSpiders = 100
@@ -127,15 +128,15 @@ buildUI _wenv model = tree
 
 handleEvent :: EventHandler AppModel AppEvent sp ep
 handleEvent _wenv _node model = \case
-  FeedSpider idx -> evts
-    where
-      evts =
+  FeedSpider idx
+    | Just spdr <- S.lookup idx model.spiders ->
         [ Producer (const (putStrLn ("Feeding spider " <> T.unpack spdr.name))),
-          Model model {spiders = setAt idx spdr {weightKilos = spdr.weightKilos + 1} model.spiders}
+          Model model {spiders = S.update idx spdr {weightKilos = spdr.weightKilos + 1} model.spiders}
         ]
-      spdr = model.spiders !! idx
+  FeedSpider _ ->
+    []
   AddSpider ->
-    [Model model {spiders = model.spiders <> [newSpider model]}]
+    [Model model {spiders = model.spiders :|> newSpider model}]
   NameColumnResized colWidth ->
     [Producer (const (putStrLn ("Name column was resized: " <> show colWidth)))]
   NameColumnSorted direction ->
@@ -153,12 +154,9 @@ newSpider model =
       weightKilos = 0.01
     }
 
-rowScrollIndex :: AppModel -> [(Spider, Int)] -> Maybe Int
-rowScrollIndex model items
-  | model.rowToScrollTo >= 0 && model.rowToScrollTo < length items =
-      Just (snd (items !! model.rowToScrollTo))
-  | otherwise =
-      Nothing
+rowScrollIndex :: AppModel -> Seq (Spider, Int) -> Maybe Int
+rowScrollIndex model items =
+  snd <$> S.lookup model.rowToScrollTo items
 
 gridColumns :: [Column AppEvent Spider]
 gridColumns = cols

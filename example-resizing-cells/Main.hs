@@ -7,15 +7,17 @@ module Main (main) where
 import Control.Concurrent (threadDelay)
 import Control.Monad (forM, forever)
 import Data.Default.Class (def)
+import Data.Sequence (Seq)
+import qualified Data.Sequence as S
 import Data.Text (Text, pack, words)
 import Monomer
-import Monomer.Hagrid (hagrid, initialWidth, showOrdColumn, textColumn, widgetColumn)
+import Monomer.Hagrid (estimatedItemHeight, hagrid_, initialWidth, minWidth, showOrdColumn, textColumn, widgetColumn)
 import Monomer.Widgets.Single
 import System.Random.Stateful (globalStdGen, uniformRM)
 import Prelude hiding (words)
 
 newtype AppModel = AppModel
-  { cellModels :: [CellModel]
+  { cellModels :: Seq CellModel
   }
   deriving (Eq, Show)
 
@@ -32,13 +34,12 @@ data AppEvent = AppInit | UpdatePhase
 
 main :: IO ()
 main = do
-  -- todo: use more rows, once hagrid can cope with that !
-  cellModels <- forM (take 20 (zip infos colors)) $ \(info, dotColor) -> do
+  cellModels <- forM (take 1_000 (zip infos colors)) $ \(info, dotColor) -> do
     dotSize <- uniformRM (30, 200) globalStdGen
     dotPhase <- uniformRM (0, 180) globalStdGen
     dotSpeed <- uniformRM (1, 4) globalStdGen
     pure CellModel {info, dotColor, dotSize, dotPhase, dotSpeed}
-  startApp AppModel {cellModels} handleEvent buildUI config
+  startApp (model cellModels) handleEvent buildUI config
   where
     config =
       [ appWindowTitle "Hagrid Resizing Cells Example",
@@ -49,6 +50,8 @@ main = do
         appWindowState (MainWindowNormal (1_200, 1_000)),
         appInitEvent AppInit
       ]
+    model cellModels =
+      AppModel {cellModels = S.fromList cellModels}
     colors =
       cycle [red, green, blue, yellow]
     infos =
@@ -59,11 +62,12 @@ buildUI :: UIBuilder AppModel AppEvent
 buildUI _wenv model = tree
   where
     tree =
-      hagrid
+      hagrid_
+        [estimatedItemHeight 60]
         [ widgetColumn "Line Index" (\i _ -> label (pack (show i))),
           (textColumn "Info" (.info)) {initialWidth = 200},
           (showOrdColumn "Phase" (.dotPhase)) {initialWidth = 300},
-          (widgetColumn "Dot" dotWidget) {initialWidth = 220}
+          (widgetColumn "Dot" dotWidget) {minWidth = 220}
         ]
         model.cellModels
 

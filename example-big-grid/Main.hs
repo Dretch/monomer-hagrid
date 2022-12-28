@@ -5,14 +5,16 @@
 module Main (main) where
 
 import Data.Function ((&))
+import Data.Sequence (Seq)
+import qualified Data.Sequence as S
 import Data.Text (Text, dropWhile, dropWhileEnd, pack, splitOn, strip)
 import Data.Text.IO (readFile)
 import Monomer
-import Monomer.Hagrid (hagrid, initialWidth, textColumn, widgetColumn)
+import Monomer.Hagrid (estimatedItemHeight, hagrid_, initialWidth, textColumn, widgetColumn)
 import Prelude hiding (dropWhile, readFile)
 
 newtype AppModel = AppModel
-  { paragraphs :: [Text]
+  { paragraphs :: Seq Text
   }
   deriving (Eq, Show)
 
@@ -40,7 +42,8 @@ buildUI :: UIBuilder AppModel AppEvent
 buildUI _wenv model = tree
   where
     tree =
-      hagrid
+      hagrid_
+        [estimatedItemHeight 100]
         [ (textColumn "Author" (const "Leo Tolstoy")) {initialWidth = 180},
           (textColumn "Title" (const "War and Peace")) {initialWidth = 160},
           widgetColumn "Line Index" (\i _ -> label (pack (show i))),
@@ -51,8 +54,9 @@ buildUI _wenv model = tree
 handleEvent :: EventHandler AppModel AppEvent sp ep
 handleEvent _wenv _node _model = \case {}
 
-splitParagraphs :: Text -> [Text]
+splitParagraphs :: Text -> Seq Text
 splitParagraphs s =
   splitOn "\n\n" s
+    & S.fromList
     & fmap (dropWhile (== '\n') . dropWhileEnd (== '\n'))
-    & filter ((/= mempty) . strip)
+    & S.filter ((/= mempty) . strip)

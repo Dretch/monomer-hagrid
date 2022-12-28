@@ -7,7 +7,7 @@ A datagrid widget for the [Monomer](https://github.com/fjvallarino/monomer) libr
 ## Current Status
 - Somewhat buggy and incomplete. Don't build your business on this.
 
-## Features
+## Current Features
 - Vertical and horizontal scrolling.
 - Resizable columns.
 - Column sorting, with a customizable sort key.
@@ -16,16 +16,14 @@ A datagrid widget for the [Monomer](https://github.com/fjvallarino/monomer) libr
 - Custom width/height padding for each cell, configured per column.
 - Scrolling to a particular row when sent a message.
 - Custom footer widgets on the bottom of each column.
+- Efficient implementation that only inflates visible widgets, scaling to at least 10000 rows.
 
-## Goals
-- Have complete and helpful documentation.
-- Be reasonably configurable and inspectable.
-- Be no uglier than standard Monomer widgets.
-- Be performant with up to ten thousand rows.
-- Have some tests.
+## Definite Future Goals
+- Better documention.
+- Better tests.
+- Prettier appearance.
 
-## Todo List
-- Improve performance with lots of rows (e.g. 1000).
+## Possible Future Goals
 - Explore providing an API where current sort/column widths/etc are stored in the parent model and updated by hagrid via a lens. This may remove some complexity around merging and the specification of initial sorts/column widths.
 
 ## API Documentation

@@ -3,6 +3,7 @@ module Monomer.HagridSpec (spec) where
 import Control.Concurrent (newEmptyMVar, putMVar, takeMVar)
 import Control.Lens ((&), (.~), (^.))
 import qualified Data.Foldable as Foldable
+import qualified Data.Sequence as S
 import Data.Text (Text)
 import GHC.IO (unsafePerformIO)
 import Monomer
@@ -115,8 +116,8 @@ merging :: Spec
 merging = describe "merging" $ do
   it "should preserve column widths when items change" $ do
     let col = textColumn "Col" (const "")
-        startNode = nodeInit wenv (hagrid [col {initialWidth = 75}] [TestItem (fixedSize 1)])
-        mergedNode = nodeMerge wenv (hagrid [col {initialWidth = 64}] [TestItem (fixedSize 2)]) startNode
+        startNode = nodeInit wenv (hagrid [col {initialWidth = 75}] (S.fromList [TestItem (fixedSize 1)]))
+        mergedNode = nodeMerge wenv (hagrid [col {initialWidth = 64}] (S.fromList [TestItem (fixedSize 2)])) startNode
         resizedNode = nodeResize wenv mergedNode (mergedNode ^. L.info . L.viewport)
     columnWidths startNode `shouldBe` [75]
     columnWidths resizedNode `shouldBe` [75]
@@ -128,10 +129,11 @@ messages = describe "messages" $ do
     let cols =
           [(textColumn "Col" (const "")) {sortKey = SortWith (_szrFixed . sizeReq)}]
         items =
-          [ TestItem (fixedSize 1),
-            TestItem (fixedSize 2),
-            TestItem (fixedSize 3)
-          ]
+          S.fromList
+            [ TestItem (fixedSize 1),
+              TestItem (fixedSize 2),
+              TestItem (fixedSize 3)
+            ]
         {-# NOINLINE scrollToRowCallback #-}
         scrollToRowCallback cbItems =
           unsafePerformIO (Nothing <$ putMVar itemsMVar cbItems) -- hacky, but seems to work!
@@ -145,14 +147,15 @@ messages = describe "messages" $ do
           nodeHandleEventEvts wenv [] cmpNode
     actualItems <- seq evts (takeMVar itemsMVar)
     actualItems
-      `shouldBe` [ (TestItem (fixedSize 1), 2),
-                   (TestItem (fixedSize 2), 1),
-                   (TestItem (fixedSize 3), 0)
-                 ]
+      `shouldBe` S.fromList
+        [ (TestItem (fixedSize 1), 2),
+          (TestItem (fixedSize 2), 1),
+          (TestItem (fixedSize 3), 0)
+        ]
 
 testColumn :: Text -> (TestItem -> SizeReq) -> Column TestEvent TestItem
 testColumn name getHeight =
-  (widgetColumn name (testCellWidget getHeight)) {paddingW = 0, paddingH = 0}
+  (widgetColumn name (testCellWidget getHeight)) {minWidth = 10, paddingW = 0, paddingH = 0}
 
 -- | We test with custom widgets because these will create special "Hagrid.Cell" nodes in the widget
 -- tree that we can later use to pick out the cell widgets.
@@ -173,7 +176,7 @@ cellViewports_ columnDefs items evts = viewports_ columnDefs items evts "Hagrid.
 viewports_ :: [Column TestEvent TestItem] -> [TestItem] -> [SystemEvent] -> WidgetType -> [Rect]
 viewports_ columnDefs items evts wType = Foldable.toList childVps
   where
-    startNode = nodeInit wenv (hagrid columnDefs items)
+    startNode = nodeInit wenv (hagrid columnDefs (S.fromList items))
     ((wenv', eventedNode, _reqs), _) = nodeHandleEvents wenv WNoInit evts startNode
     resizedNode = nodeResize wenv' eventedNode (eventedNode ^. L.info . L.viewport)
     instanceTree = widgetGetInstanceTree (resizedNode ^. L.widget) wenv' resizedNode

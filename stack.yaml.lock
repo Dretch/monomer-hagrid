@@ -5,15 +5,19 @@
 
 packages:
 - completed:
-    hackage: monomer-1.5.0.0@sha256:4240bdb2639a375f68517052a28ba11f377badb1e152e41a8c09d503e2c2e92d,15255
+    commit: c233abaf9594699c432954f8fb6409e9cdb0bd16
+    git: https://github.com/fjvallarino/monomer.git
+    name: monomer
     pantry-tree:
-      size: 14368
-      sha256: 786595e425c920a972e0d2c83ab7fcd8f2642e2c43262be737d27b5ae4c376df
+      sha256: 3f71f4734f50f341e1a51b088d86e9eee5bc9de8a1dec5c9784f18b75ac79fa3
+      size: 17797
+    version: 1.5.0.0
   original:
-    hackage: monomer-1.5.0.0
+    commit: c233abaf9594699c432954f8fb6409e9cdb0bd16
+    git: https://github.com/fjvallarino/monomer.git
 snapshots:
 - completed:
+    sha256: aa6c5e469d7b28832c3b80cd2ca9fd6ea084ba7e4efc3f225757867e25bdbcef
     size: 643197
     url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2022/10/5.yaml
-    sha256: aa6c5e469d7b28832c3b80cd2ca9fd6ea084ba7e4efc3f225757867e25bdbcef
   original: nightly-2022-10-05

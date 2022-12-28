@@ -19,7 +19,7 @@ dependencies:
 - data-default-class
 - ilist
 - lens
-- monomer
+- monomer >= 1.5.0.0
 - text
 
 default-extensions:
