@@ -32,9 +32,9 @@ See the generated docs on [Hackage](https://hackage.haskell.org/package/monomer-
 
 ## To build and run examples
 ```bash
-stack run example-basic
-stack run example-big-grid
-stack run example-resizing-cells
+stack run example-basic             # Demo of the basic functionality.
+stack run example-big-grid          # Demo of a grid with over 10000 rows.
+stack run example-resizing-cells    # Demo where the cells are constantly changing size.
 ```
 
 ## Contribution Guide
