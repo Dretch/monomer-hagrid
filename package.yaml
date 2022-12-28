@@ -1,5 +1,5 @@
 name:                monomer-hagrid
-version:             0.1.0.0
+version:             0.2.0.0
 synopsis:            A datagrid widget for the Monomer library.
 description:         A configurable Monomer widget that shows a scrollable grid of data.
 github:              Dretch/monomer-hagrid
