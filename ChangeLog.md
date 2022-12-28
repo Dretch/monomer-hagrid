@@ -1,3 +1,7 @@
+## 0.2.0.1
+### Fixed
+- Fix a bug where the grid did not update when the model went from empty to non-empty.
+
 ## 0.2.0.0
 ### Added
 - Speed up large grids by only creating widgets that are visible.

@@ -230,6 +230,8 @@ data ContentPaneModel a = ContentPaneModel
     itemsBeforeInflated :: Int,
     -- | The items that have been inflated into actual widgets.
     inflatedItems :: Seq (ItemWithIndex a),
+    -- | How many items there are after the inflated items.
+    itemsAfterInflated :: Int,
     phase :: ContentPanePhase
   }
   deriving (Eq, Show)
@@ -637,22 +639,24 @@ contentPaneOuter columnDefs model =
           fixedRowViewportOffset = 0,
           itemsBeforeInflated = 0,
           inflatedItems = mempty,
+          itemsAfterInflated = 0,
           phase = ContentPaneIdle
         }
 
-    mergeModel :: MergeModelHandler (ContentPaneModel a) (ContentPaneEvent e) s
-    mergeModel _wenv _parentModel oldModel newModel =
-      oldModel {columnWidths, fixedRowIndex, itemsBeforeInflated, inflatedItems}
+    mergeModel :: MergeModelHandler (ContentPaneModel a) (ContentPaneEvent e) (HagridModel a)
+    mergeModel _wenv parentModel oldModel newModel =
+      oldModel {columnWidths, fixedRowIndex, itemsBeforeInflated, inflatedItems, itemsAfterInflated}
       where
         columnWidths = newModel.columnWidths
-        fixedRowIndex = min (max 0 (length model.sortedItems - 1)) oldModel.fixedRowIndex
-        itemsBeforeInflated = min (length model.sortedItems) oldModel.itemsBeforeInflated
-        inflatedItems = takeAt itemsBeforeInflated (length oldModel.inflatedItems) model.sortedItems
+        fixedRowIndex = min (max 0 (length parentModel.sortedItems - 1)) oldModel.fixedRowIndex
+        itemsBeforeInflated = min (length parentModel.sortedItems) oldModel.itemsBeforeInflated
+        itemsAfterInflated = length parentModel.sortedItems - itemsBeforeInflated - length inflatedItems
+        inflatedItems = takeAt itemsBeforeInflated (length oldModel.inflatedItems) parentModel.sortedItems
 
     buildUI _wenv cpModel =
-      contentPaneInner (S.fromList columnDefs) model cpModel `nodeKey` contentPaneInnerKey
+      contentPaneInner (S.fromList columnDefs) model cpModel
 
-    handleEvent wenv node cpModel = \case
+    handleEvent _wenv node cpModel = \case
       SetVisibleArea visibleArea -> result
         where
           result = case cpModel.phase of
@@ -665,17 +669,16 @@ contentPaneOuter columnDefs model =
                             fixedRowViewportOffset,
                             itemsBeforeInflated = fixedRowIndex,
                             inflatedItems = mempty,
+                            itemsAfterInflated = length model.sortedItems - fixedRowIndex,
                             phase = ContentPaneReinflating
                           }
-                   in [Model newModel, resizeInnerRequest wenv]
-              | visibleAreaMoved ->
-                  let newModel = cpModel {visibleArea, fixedRowIndex, fixedRowViewportOffset}
                    in [Model newModel]
+              | visibleAreaMoved ->
+                  [Model cpModel {visibleArea, fixedRowIndex, fixedRowViewportOffset}]
               | otherwise -> []
             ContentPaneReinflating
               | visibleAreaMoved ->
-                  let newModel = (cpModel :: ContentPaneModel a) {visibleArea}
-                   in [Model newModel]
+                  [Model (cpModel :: ContentPaneModel a) {visibleArea}]
               | otherwise -> []
 
           (fixedRowIndex, fixedRowViewportOffset) = fixedRow minVisibleY rowHeights model cpModel
@@ -686,7 +689,7 @@ contentPaneOuter columnDefs model =
           maxVisibleY = visibleArea._rY + visibleArea._rH
 
           startItemsMissing = cpModel.itemsBeforeInflated > 0 && minVisibleY < rowsStartY
-          endItemsMissing = itemsAfterInflated model cpModel > 0 && maxVisibleY > rowsEndY
+          endItemsMissing = cpModel.itemsAfterInflated > 0 && maxVisibleY > rowsEndY
       ContentPaneScrollToRow callback -> result
         where
           result
@@ -702,7 +705,7 @@ contentPaneOuter columnDefs model =
                           inflatedItems = mempty,
                           phase = ContentPaneReinflating
                         }
-                 in [Model newModel, resizeInnerRequest wenv]
+                 in [Model newModel]
             | otherwise =
                 []
 
@@ -725,7 +728,8 @@ contentPaneOuter columnDefs model =
                         (itemsToPrepend + length cpModel.inflatedItems + itemsToAppend)
                         model.sortedItems
                     itemsBeforeInflated = cpModel.itemsBeforeInflated - itemsToPrepend
-                 in [Model cpModel {inflatedItems, itemsBeforeInflated}, resizeInnerRequest wenv]
+                    itemsAfterInflated = length model.sortedItems - length inflatedItems - itemsBeforeInflated
+                 in [Model cpModel {itemsBeforeInflated, inflatedItems, itemsAfterInflated}]
             | otherwise =
                 -- Once we have finished adding items then, if the added items are not the same size as estimated,
                 -- the row we want to scroll to might no longer be at the correct position in the viewport, so we
@@ -736,7 +740,7 @@ contentPaneOuter columnDefs model =
                  in [Model cpModel {phase = ContentPaneIdle}] <> adjustScrollEvt
 
           itemsToPrepend = itemsToAdd (fixedRowY - rowsStartY) 1 cpModel.itemsBeforeInflated
-          itemsToAppend = itemsToAdd (rowsEndY - fixedRowY) 2 (itemsAfterInflated model cpModel)
+          itemsToAppend = itemsToAdd (rowsEndY - fixedRowY) 2 cpModel.itemsAfterInflated
 
           itemsToAdd existingItemsHeight f availableItems
             | not (null model.sortedItems) && existingItemsHeight < visibleHeight * f =
@@ -777,7 +781,11 @@ contentPaneInner columnDefs model cpModel = node
     merge _wenv newNode _oldNode oldState = resultReqs newNode reqs
       where
         reqs = [ResizeWidgets (newNode ^. L.info . L.widgetId) | needResize]
-        needResize = oldState.columnWidths /= cpModel.columnWidths
+        needResize =
+          oldState.columnWidths /= cpModel.columnWidths
+            || oldState.itemsBeforeInflated /= cpModel.itemsBeforeInflated
+            || length oldState.inflatedItems /= length cpModel.inflatedItems
+            || oldState.itemsAfterInflated /= cpModel.itemsAfterInflated
 
     getSizeReq _wenv _node children = (w, h)
       where
@@ -785,7 +793,7 @@ contentPaneInner columnDefs model cpModel = node
         h = fixedSize (uninflatedHeights + inflatedHeights)
 
         uninflatedHeights = fromIntegral uninflatedItems * model.mdlEstimatedItemHeight
-        uninflatedItems = cpModel.itemsBeforeInflated + itemsAfterInflated model cpModel
+        uninflatedItems = cpModel.itemsBeforeInflated + cpModel.itemsAfterInflated
 
         inflatedHeights = sum (_szrFixed . _wniSizeReqH . _wnInfo <$> children)
 
@@ -942,14 +950,6 @@ fixedRow minVisibleY inflatedItemHeights model cpModel = (min maxRow row, offset
             offset = (y + fromIntegral indexInSection * model.mdlEstimatedItemHeight) - minVisibleY
          in (row, offset)
 
-resizeInnerRequest :: WidgetEnv s e -> EventResponse s e sp ep
-resizeInnerRequest wenv =
-  Request (ResizeWidgets (fromJust (widgetIdFromKey wenv (WidgetKey contentPaneInnerKey))))
-
-itemsAfterInflated :: HagridModel a -> ContentPaneModel a -> Int
-itemsAfterInflated model cpModel =
-  length model.sortedItems - (cpModel.itemsBeforeInflated + length cpModel.inflatedItems)
-
 dragHandleWidth :: Int
 dragHandleWidth = 4
 
@@ -964,9 +964,6 @@ contentScrollKey = "Hagrid.contentScroll"
 
 contentPaneOuterKey :: Text
 contentPaneOuterKey = "Hagrid.contentPaneOuter"
-
-contentPaneInnerKey :: Text
-contentPaneInnerKey = "Hagrid.contentPaneInner"
 
 footerPaneKey :: Text
 footerPaneKey = "Hagrid.footerPane"
