@@ -17,7 +17,7 @@ packages:
     git: https://github.com/fjvallarino/monomer.git
 snapshots:
 - completed:
-    sha256: aa6c5e469d7b28832c3b80cd2ca9fd6ea084ba7e4efc3f225757867e25bdbcef
-    size: 643197
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2022/10/5.yaml
-  original: nightly-2022-10-05
+    sha256: bfafe5735ccb74527d754b1f9999ded72d7c3a6c3a88529449661431ccfbd6cc
+    size: 649327
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/20/8.yaml
+  original: lts-20.8
