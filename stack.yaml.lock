@@ -5,19 +5,15 @@
 
 packages:
 - completed:
-    commit: c233abaf9594699c432954f8fb6409e9cdb0bd16
-    git: https://github.com/fjvallarino/monomer.git
-    name: monomer
+    hackage: monomer-1.5.1.0@sha256:18e3ce60c7f5d3fae74bf5ace7515f0e252b12ccc4b71030f948e6fdc1f49a99,16741
     pantry-tree:
-      sha256: 3f71f4734f50f341e1a51b088d86e9eee5bc9de8a1dec5c9784f18b75ac79fa3
-      size: 17797
-    version: 1.5.0.0
+      sha256: 3dde2b635d1298c3b734c0b28bae8fa4956bc2ad9ef89f81bbb04ec1eeb09d0c
+      size: 14513
   original:
-    commit: c233abaf9594699c432954f8fb6409e9cdb0bd16
-    git: https://github.com/fjvallarino/monomer.git
+    hackage: monomer-1.5.1.0
 snapshots:
 - completed:
-    sha256: bfafe5735ccb74527d754b1f9999ded72d7c3a6c3a88529449661431ccfbd6cc
-    size: 649327
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/20/8.yaml
-  original: lts-20.8
+    sha256: 17870c63f8041ac17a38096124abeb953cb14d84bfc96deb88f9b24daa97b347
+    size: 649332
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/20/10.yaml
+  original: lts-20.10

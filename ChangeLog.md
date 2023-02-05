@@ -1,4 +1,6 @@
-## 0.2.0.2 (Not yet released)
+## 0.2.1.0
+### Changed
+- Require the latest monomer (1.5.1.0), to get the fix for https://github.com/fjvallarino/monomer/issues/225
 ### Fixed
 - Always expand into all available space, even with no items in the grid, for consistency.
 
