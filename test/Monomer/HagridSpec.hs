@@ -3,6 +3,7 @@ module Monomer.HagridSpec (spec) where
 import Control.Concurrent (newEmptyMVar, putMVar, takeMVar)
 import Control.Lens ((&), (.~), (^.))
 import qualified Data.Foldable as Foldable
+import Data.Sequence (Seq)
 import qualified Data.Sequence as S
 import Data.Text (Text)
 import GHC.IO (unsafePerformIO)
@@ -63,12 +64,25 @@ resize = describe "resize" $ do
       `shouldBe` [Rect 0 40 50 17]
 
   it "should have zero-height footer when no footer widgets specified" $
-    viewports_
+    hagridViewports
       [(testColumn "Col 1" (const (fixedSize 33))) {initialWidth = 50}]
       [TestItem (fixedSize 0)]
       []
       "Hagrid.FooterPane"
       `shouldBe` [Rect 0 100 100 0]
+
+  it "should expand into available space both vertically and horizontally" $ do
+    viewports tree [] "Hagrid.Root" `shouldBe` [Rect 0 0 90 90]
+  where
+    tree =
+      vstack
+        [ hstack
+            [ hagrid [] (mempty :: Seq TestItem),
+              label10x10
+            ],
+          label10x10
+        ]
+    label10x10 = label "" `styleBasic` [width 10, height 10]
 
 sorting :: Spec
 sorting = describe "sorting" $ do
@@ -85,7 +99,7 @@ sorting = describe "sorting" $ do
                  ]
 
   it "should sort in ascending order when column header clicked" $ do
-    cellViewports_
+    cellViewportsEvts
       [(testColumn "Col 1" sizeReq) {initialWidth = 50, sortKey = SortWith (_szrFixed . sizeReq)}]
       [ TestItem (fixedSize 20),
         TestItem (fixedSize 10),
@@ -98,7 +112,7 @@ sorting = describe "sorting" $ do
                  ]
 
   it "should sort in descending order when column header clicked again" $ do
-    cellViewports_
+    cellViewportsEvts
       [(testColumn "Col 1" sizeReq) {initialWidth = 50, sortKey = SortWith (_szrFixed . sizeReq)}]
       [ TestItem (fixedSize 20),
         TestItem (fixedSize 10),
@@ -168,15 +182,20 @@ testCellWidget getHeight _idx item = wgt
 
 cellViewports :: [Column TestEvent TestItem] -> [TestItem] -> [Rect]
 cellViewports columnDefs items =
-  cellViewports_ columnDefs items []
+  cellViewportsEvts columnDefs items []
 
-cellViewports_ :: [Column TestEvent TestItem] -> [TestItem] -> [SystemEvent] -> [Rect]
-cellViewports_ columnDefs items evts = viewports_ columnDefs items evts "Hagrid.Cell"
+cellViewportsEvts :: [Column TestEvent TestItem] -> [TestItem] -> [SystemEvent] -> [Rect]
+cellViewportsEvts columnDefs items evts =
+  hagridViewports columnDefs items evts "Hagrid.Cell"
 
-viewports_ :: [Column TestEvent TestItem] -> [TestItem] -> [SystemEvent] -> WidgetType -> [Rect]
-viewports_ columnDefs items evts wType = Foldable.toList childVps
+hagridViewports :: [Column TestEvent TestItem] -> [TestItem] -> [SystemEvent] -> WidgetType -> [Rect]
+hagridViewports columnDefs items =
+  viewports (hagrid columnDefs (S.fromList items))
+
+viewports :: WidgetNode TestModel TestEvent -> [SystemEvent] -> WidgetType -> [Rect]
+viewports wgt evts wType = Foldable.toList childVps
   where
-    startNode = nodeInit wenv (hagrid columnDefs (S.fromList items))
+    startNode = nodeInit wenv wgt
     ((wenv', eventedNode, _reqs), _) = nodeHandleEvents wenv WNoInit evts startNode
     resizedNode = nodeResize wenv' eventedNode (eventedNode ^. L.info . L.viewport)
     instanceTree = widgetGetInstanceTree (resizedNode ^. L.widget) wenv' resizedNode
@@ -196,13 +215,13 @@ columnWidths node = fromFractional <$> colWidths
       widgetGetInstanceTree (_wnWidget node) wenv node
 
 widgetsOfType :: WidgetType -> WidgetInstanceNode -> [WidgetInstanceNode]
-widgetsOfType typ node = thisOne <> childOnes
+widgetsOfType typ node = result
   where
-    thisOne
-      | (node ^. (L.info . L.widgetType)) == typ = [node]
-      | otherwise = []
+    result
+      | (node ^. (L.info . L.widgetType)) == typ = node : childOnes
+      | otherwise = childOnes
     childOnes =
-      mconcat (widgetsOfType typ <$> Foldable.toList (node ^. L.children))
+      foldMap (widgetsOfType typ) (node ^. L.children)
 
 windowSize :: Size
 windowSize = Size 100 100

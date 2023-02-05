@@ -289,12 +289,21 @@ hagrid_ cfg columnDefs items = widget
         tree =
           vstack
             [ headerPane columnDefs model `nodeKey` headerPaneKey,
-              contentScroll `nodeKey` contentScrollKey,
+              contentScroll
+                `styleBasic` [sizeReqW useExtra, sizeReqH useExtra]
+                `nodeKey` contentScrollKey,
               footerPane columnDefs model `nodeKey` footerPaneKey
             ]
         contentScroll =
           scroll_ [onChange ContentScrollChange] $
             contentPaneOuter columnDefs model `nodeKey` contentPaneOuterKey
+        useExtra =
+          SizeReq
+            { _szrFixed = 0,
+              _szrFlex = 0,
+              _szrExtra = 1,
+              _szrFactor = 1
+            }
 
     handleEvent :: EventHandler (HagridModel a) (HagridEvent e) sp e
     handleEvent _wenv _node model = \case
@@ -593,7 +602,7 @@ headerDragHandle colIndex columnDef column = tree
 
 -- | This needs to be at least as big as the width of a vertical scrollbar.
 hScrollFudgeFactor :: Double
-hScrollFudgeFactor = 100
+hScrollFudgeFactor = 20
 
 -- | Composite wrapper to allow creating/removing child widgets during resize.
 contentPaneOuter ::

@@ -1,3 +1,7 @@
+## 0.2.0.2 (Not yet released)
+### Fixed
+- Always expand into all available space, even with no items in the grid, for consistency.
+
 ## 0.2.0.1
 ### Fixed
 - Fix a bug where the grid did not update when the model went from empty to non-empty.
