@@ -18,7 +18,7 @@ jobs:
         enable-stack: true
 
     - name: 'Check formatting'
-      uses: mrkkrp/ormolu-action@v6
+      uses: mrkkrp/ormolu-action@v9
 
     - name: 'Check package metadata'
       run: cabal check
