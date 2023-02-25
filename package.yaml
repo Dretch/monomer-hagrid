@@ -31,6 +31,7 @@ default-extensions:
 
 flags:
   examples:
+    description: Whether to build the example executables. Off by default because they are not usually wanted.
     manual: true
     default: false
 
