@@ -1,3 +1,7 @@
+## 0.2.1.1
+### Changed
+- No longer build examples by default, since library users probably will not want them. 
+
 ## 0.2.1.0
 ### Changed
 - Require the latest monomer (1.5.1.0), to get the fix for https://github.com/fjvallarino/monomer/issues/225
