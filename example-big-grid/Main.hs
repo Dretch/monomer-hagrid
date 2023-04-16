@@ -1,7 +1,3 @@
-{-# LANGUAGE EmptyCase #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE NamedFieldPuns #-}
-
 module Main (main) where
 
 import Data.Function ((&))

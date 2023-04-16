@@ -1,6 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 
@@ -175,11 +172,11 @@ gridColumns = cols
         (textColumn "Species" (.species))
           { initialWidth = 200
           },
-        (textColumn "Date of Birth" (T.pack . formatTime defaultTimeLocale "%Y-%m-%d" . dateOfBirth))
+        (textColumn "Date of Birth" (T.pack . formatTime defaultTimeLocale "%Y-%m-%d" . (.dateOfBirth)))
           { initialWidth = 200
           },
-        (textColumn "Weight (Kg)" (T.pack . printf "%.2f" . weightKilos))
-          { sortKey = SortWith weightKilos,
+        (textColumn "Weight (Kg)" (T.pack . printf "%.2f" . (.weightKilos)))
+          { sortKey = SortWith (.weightKilos),
             initialWidth = 200,
             align = ColumnAlignRight,
             footerWidget = CustomFooterWidget sumWeightFooter
@@ -197,7 +194,7 @@ gridColumns = cols
     sumWeightFooter spiders = tree
       where
         tree = labelledFooter "Sum" (T.pack (printf "%.2f" totalWeightKilos))
-        totalWeightKilos = sum (weightKilos . fst <$> spiders)
+        totalWeightKilos = sum ((.weightKilos) . fst <$> spiders)
 
     labelledFooter labelText text =
       hstack

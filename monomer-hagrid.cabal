@@ -5,7 +5,7 @@ cabal-version: 2.0
 -- see: https://github.com/sol/hpack
 
 name:           monomer-hagrid
-version:        0.2.1.1
+version:        0.3.0.0
 synopsis:       A datagrid widget for the Monomer library.
 description:    A configurable Monomer widget that shows a scrollable grid of data.
 category:       GUI
@@ -40,9 +40,17 @@ library
   default-extensions:
       DisambiguateRecordFields
       DuplicateRecordFields
+      EmptyCase
       FlexibleContexts
+      GADTs
+      LambdaCase
+      NamedFieldPuns
+      NoFieldSelectors
+      NumericUnderscores
       OverloadedRecordDot
       OverloadedStrings
+      RankNTypes
+      ScopedTypeVariables
   ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints
   build-depends:
       base >=4.7 && <5
@@ -65,9 +73,17 @@ executable example-basic
   default-extensions:
       DisambiguateRecordFields
       DuplicateRecordFields
+      EmptyCase
       FlexibleContexts
+      GADTs
+      LambdaCase
+      NamedFieldPuns
+      NoFieldSelectors
+      NumericUnderscores
       OverloadedRecordDot
       OverloadedStrings
+      RankNTypes
+      ScopedTypeVariables
   ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
@@ -96,9 +112,17 @@ executable example-big-grid
   default-extensions:
       DisambiguateRecordFields
       DuplicateRecordFields
+      EmptyCase
       FlexibleContexts
+      GADTs
+      LambdaCase
+      NamedFieldPuns
+      NoFieldSelectors
+      NumericUnderscores
       OverloadedRecordDot
       OverloadedStrings
+      RankNTypes
+      ScopedTypeVariables
   ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
@@ -126,9 +150,17 @@ executable example-resizing-cells
   default-extensions:
       DisambiguateRecordFields
       DuplicateRecordFields
+      EmptyCase
       FlexibleContexts
+      GADTs
+      LambdaCase
+      NamedFieldPuns
+      NoFieldSelectors
+      NumericUnderscores
       OverloadedRecordDot
       OverloadedStrings
+      RankNTypes
+      ScopedTypeVariables
   ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
@@ -160,9 +192,17 @@ test-suite spec
   default-extensions:
       DisambiguateRecordFields
       DuplicateRecordFields
+      EmptyCase
       FlexibleContexts
+      GADTs
+      LambdaCase
+      NamedFieldPuns
+      NoFieldSelectors
+      NumericUnderscores
       OverloadedRecordDot
       OverloadedStrings
+      RankNTypes
+      ScopedTypeVariables
   ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5

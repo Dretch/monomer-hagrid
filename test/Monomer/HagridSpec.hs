@@ -33,8 +33,8 @@ resize :: Spec
 resize = describe "resize" $ do
   it "should assign cell widths according to column widths" $ do
     cellViewports
-      [ (testColumn "Col 1" sizeReq) {initialWidth = 33},
-        (testColumn "Col 2" sizeReq) {initialWidth = 77}
+      [ (testColumn "Col 1" (.sizeReq)) {initialWidth = 33},
+        (testColumn "Col 2" (.sizeReq)) {initialWidth = 77}
       ]
       [TestItem (fixedSize 10)]
       `shouldBe` [ Rect 0 40 33 10,
@@ -43,7 +43,7 @@ resize = describe "resize" $ do
 
   it "should assign single column cell heights according to cell heights" $ do
     cellViewports
-      [ (testColumn "Col 1" sizeReq) {initialWidth = 50}
+      [ (testColumn "Col 1" (.sizeReq)) {initialWidth = 50}
       ]
       [TestItem (fixedSize 33), TestItem (fixedSize 77)]
       `shouldBe` [Rect 0 40 50 33, Rect 0 73 50 77]
@@ -58,7 +58,7 @@ resize = describe "resize" $ do
 
   it "should use both fixed and flex height to calculate row height" $ do
     cellViewports
-      [ (testColumn "Col 1" sizeReq) {initialWidth = 50}
+      [ (testColumn "Col 1" (.sizeReq)) {initialWidth = 50}
       ]
       [TestItem (fixedSize 10 & L.flex .~ 7)]
       `shouldBe` [Rect 0 40 50 17]
@@ -88,7 +88,7 @@ sorting :: Spec
 sorting = describe "sorting" $ do
   it "should not sort rows by default" $ do
     cellViewports
-      [(testColumn "Col 1" sizeReq) {initialWidth = 50, sortKey = SortWith (_szrFixed . sizeReq)}]
+      [(testColumn "Col 1" (.sizeReq)) {initialWidth = 50, sortKey = SortWith (_szrFixed . (.sizeReq))}]
       [ TestItem (fixedSize 20),
         TestItem (fixedSize 10),
         TestItem (fixedSize 30)
@@ -100,7 +100,7 @@ sorting = describe "sorting" $ do
 
   it "should sort in ascending order when column header clicked" $ do
     cellViewportsEvts
-      [(testColumn "Col 1" sizeReq) {initialWidth = 50, sortKey = SortWith (_szrFixed . sizeReq)}]
+      [(testColumn "Col 1" (.sizeReq)) {initialWidth = 50, sortKey = SortWith (_szrFixed . (.sizeReq))}]
       [ TestItem (fixedSize 20),
         TestItem (fixedSize 10),
         TestItem (fixedSize 30)
@@ -113,7 +113,7 @@ sorting = describe "sorting" $ do
 
   it "should sort in descending order when column header clicked again" $ do
     cellViewportsEvts
-      [(testColumn "Col 1" sizeReq) {initialWidth = 50, sortKey = SortWith (_szrFixed . sizeReq)}]
+      [(testColumn "Col 1" (.sizeReq)) {initialWidth = 50, sortKey = SortWith (_szrFixed . (.sizeReq))}]
       [ TestItem (fixedSize 20),
         TestItem (fixedSize 10),
         TestItem (fixedSize 30)
@@ -141,7 +141,7 @@ messages = describe "messages" $ do
   it "should give items and sorted indices to scrollToRow callback" $ do
     itemsMVar <- newEmptyMVar
     let cols =
-          [(textColumn "Col" (const "")) {sortKey = SortWith (_szrFixed . sizeReq)}]
+          [(textColumn "Col" (const "")) {sortKey = SortWith (_szrFixed . (.sizeReq))}]
         items =
           S.fromList
             [ TestItem (fixedSize 1),

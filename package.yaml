@@ -1,5 +1,5 @@
 name:                monomer-hagrid
-version:             0.2.1.1
+version:             0.3.0.0
 synopsis:            A datagrid widget for the Monomer library.
 description:         A configurable Monomer widget that shows a scrollable grid of data.
 github:              Dretch/monomer-hagrid
@@ -25,9 +25,17 @@ dependencies:
 default-extensions:
   - DisambiguateRecordFields
   - DuplicateRecordFields
+  - EmptyCase
   - FlexibleContexts
+  - GADTs
+  - LambdaCase
+  - NamedFieldPuns
+  - NoFieldSelectors
+  - NumericUnderscores
   - OverloadedRecordDot
   - OverloadedStrings
+  - RankNTypes
+  - ScopedTypeVariables
 
 flags:
   examples:

@@ -1,8 +1,3 @@
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 
 -- | A datagrid widget for the Monomer UI library.
@@ -414,7 +409,7 @@ headerPane columnDefs model = makeNode (initialHeaderFooterState model)
           where
             Rect l t _w h = viewport
             widgetWidths = do
-              (i, w) <- indexed (currentWidth <$> model.columns)
+              (i, w) <- indexed ((.currentWidth) <$> model.columns)
               -- center the drag handle inbetween the columns
               let buttonW
                     | i == 0 = fromIntegral w - (dragHandleWidth / 2)
@@ -466,7 +461,7 @@ footerPane columnDefs model = makeNode (initialHeaderFooterState model)
             & L.children .~ S.fromList (catMaybes childWidgets)
 
     childWidgets :: [Maybe (WidgetNode (HagridModel a) (HagridEvent e))]
-    childWidgets = footerWidgetNode model.sortedItems . footerWidget <$> columnDefs
+    childWidgets = footerWidgetNode model.sortedItems . (.footerWidget) <$> columnDefs
 
     makeWidget :: HeaderFooterState -> Widget (HagridModel a) (HagridEvent e)
     makeWidget state = container
@@ -491,7 +486,7 @@ footerPane columnDefs model = makeNode (initialHeaderFooterState model)
 initialHeaderFooterState :: HagridModel a -> HeaderFooterState
 initialHeaderFooterState model =
   HeaderFooterState
-    { columnWidths = currentWidth <$> model.columns,
+    { columnWidths = (.currentWidth) <$> model.columns,
       offsetX = 0
     }
 
@@ -621,7 +616,7 @@ contentPaneOuter columnDefs model =
   where
     initialModel =
       ContentPaneModel
-        { columnWidths = currentWidth <$> model.columns,
+        { columnWidths = (.currentWidth) <$> model.columns,
           visibleArea = Rect 0 0 0 0,
           fixedRowIndex = 0,
           fixedRowViewportOffset = 0,
