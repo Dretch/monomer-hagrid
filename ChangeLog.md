@@ -1,4 +1,5 @@
 ## 0.3.0.0
+### Changed
 - Use NoFieldSelectors.
 
 ## 0.2.1.1
