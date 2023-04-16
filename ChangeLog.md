@@ -1,3 +1,6 @@
+## 0.3.0.0
+- Use NoFieldSelectors.
+
 ## 0.2.1.1
 ### Changed
 - No longer build examples by default, since library users probably will not want them. 
