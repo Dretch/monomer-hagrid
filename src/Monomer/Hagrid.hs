@@ -504,7 +504,8 @@ createHeaderFooter state makeWidget container =
         containerUpdateCWenv = updateCWenv,
         containerMerge = merge,
         containerHandleMessage = handleMessage,
-        containerGetSizeReq = getSizeReq
+        containerGetSizeReq = getSizeReq,
+        containerUseScissor = True -- otherwise the buttons extend outside the header when the grid scrolls horizontally
       }
   where
     -- ensures child widgets don't disappear when scrolling

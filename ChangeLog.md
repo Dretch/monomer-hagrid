@@ -1,3 +1,7 @@
+## 0.3.0.1
+### Fixed
+- Fix a bug where header buttons were drawn outside the grid during horizontal scrolling.
+
 ## 0.3.0.0
 ### Changed
 - Use NoFieldSelectors.
