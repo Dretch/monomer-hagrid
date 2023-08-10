@@ -388,7 +388,7 @@ headerPane columnDefs model = makeNode (initialHeaderFooterState model)
             & L.children .~ S.fromList childWidgets
 
         childWidgets =
-          mconcat (zipWith3 childWidgetPair [0..] columnDefs model.columns)
+          mconcat (zipWith3 childWidgetPair [0 ..] columnDefs model.columns)
 
         childWidgetPair i columnDef column = [btn, handle]
           where
