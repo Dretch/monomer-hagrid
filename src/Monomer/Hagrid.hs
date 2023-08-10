@@ -40,7 +40,6 @@ import Control.Monad as X (forM_)
 import Data.Data (Typeable)
 import Data.Default.Class (Default, def)
 import Data.Foldable (foldl')
-import Data.List.Index (indexed, izipWith, modifyAt)
 import Data.Maybe (catMaybes, isNothing, maybeToList)
 import Data.Maybe as X (fromMaybe)
 import Data.Ord (Down (Down))
@@ -332,7 +331,7 @@ hagrid_ cfg columnDefs items = widget
           handler =
             Report <$> maybeToList (sortHandler <*> (snd <$> sortColumn))
       ResizeColumn colIndex newWidth ->
-        [Model (model {columns = modifyAt colIndex (\c -> c {currentWidth = newWidth}) model.columns})]
+        [Model model {columns = model.columns & ix colIndex %~ (\c -> c {currentWidth = newWidth})}]
       ResizeColumnFinished colIndex -> result
         where
           ModelColumn {currentWidth} = model.columns !! colIndex
@@ -389,7 +388,7 @@ headerPane columnDefs model = makeNode (initialHeaderFooterState model)
             & L.children .~ S.fromList childWidgets
 
         childWidgets =
-          mconcat (izipWith childWidgetPair columnDefs model.columns)
+          mconcat (zipWith3 childWidgetPair [0..] columnDefs model.columns)
 
         childWidgetPair i columnDef column = [btn, handle]
           where
@@ -409,12 +408,10 @@ headerPane columnDefs model = makeNode (initialHeaderFooterState model)
           where
             Rect l t _w h = viewport
             widgetWidths = do
-              (i, w) <- indexed ((.currentWidth) <$> model.columns)
               -- center the drag handle inbetween the columns
-              let buttonW
-                    | i == 0 = fromIntegral w - (dragHandleWidth / 2)
-                    | otherwise = fromIntegral w - dragHandleWidth
-              [buttonW, dragHandleWidth]
+              let wDeltas = dragHandleWidth / 2 : repeat dragHandleWidth
+              (wd, w) <- zip wDeltas ((.currentWidth) <$> model.columns)
+              [fromIntegral w - wd, dragHandleWidth]
             (assignedAreas, _) = foldl' assignArea (mempty, l) widgetWidths
             assignArea (areas, colX) columnWidth =
               (areas :|> Rect colX t columnWidth h, colX + columnWidth)

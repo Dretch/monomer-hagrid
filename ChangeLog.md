@@ -1,3 +1,7 @@
+## 0.3.1.0
+### Changed
+- Remove ilist package dependency, since it is not in the latest Stackage LTS and is easily replaced.
+
 ## 0.3.0.1
 ### Fixed
 - Fix a bug where header buttons were drawn outside the grid during horizontal scrolling.

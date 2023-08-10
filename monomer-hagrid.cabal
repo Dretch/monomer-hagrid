@@ -1,11 +1,11 @@
 cabal-version: 2.0
 
--- This file has been generated from package.yaml by hpack version 0.35.1.
+-- This file has been generated from package.yaml by hpack version 0.35.2.
 --
 -- see: https://github.com/sol/hpack
 
 name:           monomer-hagrid
-version:        0.3.0.1
+version:        0.3.1.0
 synopsis:       A datagrid widget for the Monomer library.
 description:    A configurable Monomer widget that shows a scrollable grid of data.
 category:       GUI
@@ -56,7 +56,6 @@ library
       base >=4.7 && <5
     , containers
     , data-default-class
-    , ilist
     , lens
     , monomer >=1.5.1.0 && <1.6
     , text
@@ -89,7 +88,6 @@ executable example-basic
       base >=4.7 && <5
     , containers
     , data-default-class
-    , ilist
     , lens
     , monomer >=1.5.1.0 && <1.6
     , monomer-hagrid
@@ -128,7 +126,6 @@ executable example-big-grid
       base >=4.7 && <5
     , containers
     , data-default-class
-    , ilist
     , lens
     , monomer >=1.5.1.0 && <1.6
     , monomer-hagrid
@@ -166,7 +163,6 @@ executable example-resizing-cells
       base >=4.7 && <5
     , containers
     , data-default-class
-    , ilist
     , lens
     , monomer >=1.5.1.0 && <1.6
     , monomer-hagrid
@@ -211,7 +207,6 @@ test-suite spec
     , data-default
     , data-default-class
     , hspec ==2.*
-    , ilist
     , lens
     , monomer >=1.5.1.0 && <1.6
     , monomer-hagrid
