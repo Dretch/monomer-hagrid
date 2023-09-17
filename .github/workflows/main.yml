@@ -48,7 +48,7 @@ jobs:
 
     needs: [build]
 
-    if: ${{ github.ref_type == 'tag' }}
+    if: github.ref_type == 'tag'
 
     runs-on: ubuntu-22.04
 
