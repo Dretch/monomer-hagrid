@@ -131,7 +131,7 @@ data ColumnWidget e a
     LabelWidget (Int -> a -> Text)
   | -- | Create a widget of arbitrary type. The function receives the original item
     -- index (i.e. not the index in the sorted list) and the item itself.
-    CustomWidget (forall s. WidgetModel s => Int -> a -> WidgetNode s e)
+    CustomWidget (forall s. (WidgetModel s) => Int -> a -> WidgetNode s e)
 
 -- | How to create the footer widget for a column.
 data ColumnFooterWidget e a
@@ -139,7 +139,7 @@ data ColumnFooterWidget e a
     NoFooterWidget
   | -- | Create a footer widget. The function receives the items in their current sort
     -- order, and also along with each item it's original (unsorted) index.
-    CustomFooterWidget (forall s. WidgetModel s => Seq (ItemWithIndex a) -> WidgetNode s e)
+    CustomFooterWidget (forall s. (WidgetModel s) => Seq (ItemWithIndex a) -> WidgetNode s e)
 
 -- | How to align the widget within each cell of a column.
 data ColumnAlign
@@ -152,7 +152,7 @@ data ColumnSortKey a
   = -- | Means that a column can't be sorted.
     DontSort
   | -- | Means that a column can be sorted, using the specified sort key function.
-    forall b. Ord b => SortWith (a -> b)
+    forall b. (Ord b) => SortWith (a -> b)
 
 -- | Whether a column is being sorted in ascending or descending order.
 data SortDirection
@@ -177,7 +177,7 @@ data HagridEvent e
   | OrderByColumn Int
   | ResizeColumn Int Int
   | ResizeColumnFinished Int
-  | forall a. Typeable a => ScrollToRow (ScrollToRowCallback a)
+  | forall a. (Typeable a) => ScrollToRow (ScrollToRowCallback a)
   | ScrollToRect Rect
   | ParentEvent e
 
@@ -242,7 +242,7 @@ data ContentPaneEvent e
   = SetVisibleArea {visibleArea :: Rect}
   | InnerResizeComplete
   | ContentPaneParentEvent e
-  | forall a. Typeable a => ContentPaneScrollToRow (ScrollToRowCallback a)
+  | forall a. (Typeable a) => ContentPaneScrollToRow (ScrollToRowCallback a)
 
 -- | Creates a hagrid widget, using the default configuration.
 hagrid ::
@@ -377,7 +377,7 @@ accentColor wenv = transColor
     color = fromMaybe (rgb 255 255 255) (_sstText style >>= _txsFontColor)
     transColor = color {_colorA = 0.7}
 
-headerPane :: forall e a. WidgetEvent e => [Column e a] -> HagridModel a -> WidgetNode (HagridModel a) (HagridEvent e)
+headerPane :: forall e a. (WidgetEvent e) => [Column e a] -> HagridModel a -> WidgetNode (HagridModel a) (HagridEvent e)
 headerPane columnDefs model = makeNode (initialHeaderFooterState model)
   where
     makeNode :: HeaderFooterState -> WidgetNode (HagridModel a) (HagridEvent e)
@@ -437,7 +437,7 @@ headerPane columnDefs model = makeNode (initialHeaderFooterState model)
             indL = l + w + state.offsetX - indW - pad
             indRect = Rect indL indT indW indW
 
-headerButton :: WidgetEvent e => Int -> Column e a -> WidgetNode (HagridModel a) (HagridEvent e)
+headerButton :: (WidgetEvent e) => Int -> Column e a -> WidgetNode (HagridModel a) (HagridEvent e)
 headerButton colIndex columnDef =
   button_ columnDef.name (OrderByColumn colIndex) [ellipsis]
     `styleBasic` [radius 0]
@@ -533,7 +533,7 @@ createHeaderFooter state makeWidget container =
                 node & L.widget .~ makeWidget state {offsetX}
         result = cast msg >>= handleTypedMessage
 
-headerDragHandle :: WidgetEvent e => Int -> Column e a -> ModelColumn -> WidgetNode s (HagridEvent e)
+headerDragHandle :: (WidgetEvent e) => Int -> Column e a -> ModelColumn -> WidgetNode s (HagridEvent e)
 headerDragHandle colIndex columnDef column = tree
   where
     tree = defaultWidgetNode "Hagrid.HeaderDragHandle" (headerDragHandleWidget Nothing)
