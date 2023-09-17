@@ -3,26 +3,6 @@ name: CI
 on: [push]
 
 jobs:
-  check-formatting-and-metadata:
-
-    runs-on: ubuntu-22.04
-
-    steps:
-
-    - uses: actions/checkout@v3
-      
-    - name: 'Install Stack'
-      uses: haskell/actions/setup@v2
-      with:
-        stack-setup-ghc: true
-        enable-stack: true
-
-    - name: 'Check formatting'
-      uses: mrkkrp/ormolu-action@v9
-
-    - name: 'Check package metadata'
-      run: cabal check
-
   build:
 
     runs-on: ubuntu-22.04
@@ -50,25 +30,15 @@ jobs:
         stack-setup-ghc: true
         enable-stack: true
     
+    - name: 'Check formatting'
+      uses: mrkkrp/ormolu-action@v9
+
+    - name: 'Check package metadata'
+      run: cabal check
+
     - name: 'Build and test'
       run: stack test
 
-  package:
-
-    needs: [check-formatting-and-metadata, build]
-
-    runs-on: ubuntu-22.04
-
-    steps:
-
-    - uses: actions/checkout@v3
-      
-    - name: 'Install Stack'
-      uses: haskell/actions/setup@v2
-      with:
-        stack-setup-ghc: true
-        enable-stack: true
-    
     - name: 'Generate package'
       run: stack sdist
 
@@ -79,3 +49,25 @@ jobs:
         path: .stack-work/dist/*/*/monomer-hagrid-*.tar.gz
         if-no-files-found: error
 
+  publish:
+
+    needs: [build]
+
+    if: ${{ github.ref_type == 'tag' }}
+
+    runs-on: ubuntu-22.04
+
+    environment:
+      name: hackage
+      url: https://hackage.haskell.org/package/monomer-hagrid
+
+    steps:
+    - uses: actions/download-artifact@v3
+      with:
+        name: package
+
+    - name: 'Publish Package to Hackage'
+      run: cabal upload -u "$HACKAGE_USERNAME" -p "$HACKAGE_PASSWORD" --publish */*/*.tar.gz
+      env:
+        HACKAGE_USERNAME: ${{ secrets.HACKAGE_USERNAME }}
+        HACKAGE_PASSWORD: ${{ secrets.HACKAGE_PASSWORD }}
