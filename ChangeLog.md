@@ -1,3 +1,7 @@
+## 0.3.1.1
+### Fixed
+- Fixed a bug where row background color was determined by the original row index rather than the sorted index.
+
 ## 0.3.1.0
 ### Changed
 - Remove ilist package dependency, since it is not in the latest Stackage LTS and is easily replaced.

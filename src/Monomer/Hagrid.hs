@@ -757,7 +757,7 @@ contentPaneInner columnDefs model cpModel = node
             containerResize = resize
           }
 
-    rowWidgets = contentPaneRow columnDefs cpModel <$> cpModel.inflatedItems
+    rowWidgets = S.mapWithIndex (contentPaneRow columnDefs cpModel) cpModel.inflatedItems
 
     merge _wenv newNode _oldNode oldState = resultReqs newNode reqs
       where
@@ -799,9 +799,10 @@ contentPaneRow ::
   (CompositeModel a, WidgetEvent e) =>
   Seq (Column e a) ->
   ContentPaneModel a ->
-  (a, Int) ->
+  Int ->
+  ItemWithIndex a ->
   WidgetNode (ContentPaneModel a) (ContentPaneEvent e)
-contentPaneRow columnDefs cpModel (item, rowIdx) = tree
+contentPaneRow columnDefs cpModel sortedIdx item = tree
   where
     tree =
       defaultWidgetNode "Hagrid.Row" widget
@@ -809,7 +810,7 @@ contentPaneRow columnDefs cpModel (item, rowIdx) = tree
 
     widget =
       createContainer
-        (cpModel.columnWidths, item, rowIdx)
+        (cpModel.columnWidths, item, sortedIdx)
         def
           { containerGetSizeReq = getSizeReq,
             containerResize = resize,
@@ -818,7 +819,7 @@ contentPaneRow columnDefs cpModel (item, rowIdx) = tree
 
     cellWidgets = do
       Column {widget} <- columnDefs
-      pure (cellWidget rowIdx item widget)
+      pure (cellWidget item widget)
 
     getSizeReq _wenv _node children = (w, h)
       where
@@ -864,7 +865,7 @@ contentPaneRow columnDefs cpModel (item, rowIdx) = tree
         colXs = scanl (+) 0 (fromIntegral <$> cpModel.columnWidths)
         bgColor
           | mouseover = Just mouseOverColor
-          | rowIdx `mod` 2 == 1 = Just oddRowBgColor
+          | sortedIdx `mod` 2 == 1 = Just oddRowBgColor
           | otherwise = Nothing
         vp = node ^. L.info . L.viewport
         mouseover = pointInRect mouse vp
@@ -1052,11 +1053,10 @@ defaultColumn name widget =
 
 cellWidget ::
   (CompositeModel a, WidgetEvent e) =>
-  Int ->
-  a ->
+  ItemWithIndex a ->
   ColumnWidget e a ->
   WidgetNode (ContentPaneModel a) (ContentPaneEvent e)
-cellWidget idx item = \case
+cellWidget (item, idx) = \case
   LabelWidget get -> label_ (get idx item) [ellipsis]
   CustomWidget get -> widget
     where
