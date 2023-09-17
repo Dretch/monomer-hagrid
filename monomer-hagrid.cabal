@@ -68,7 +68,7 @@ executable example-basic
   autogen-modules:
       Paths_monomer_hagrid
   hs-source-dirs:
-      example-basic
+      examples/basic
   default-extensions:
       DisambiguateRecordFields
       DuplicateRecordFields
@@ -106,7 +106,7 @@ executable example-big-grid
   autogen-modules:
       Paths_monomer_hagrid
   hs-source-dirs:
-      example-big-grid
+      examples/big-grid
   default-extensions:
       DisambiguateRecordFields
       DuplicateRecordFields
@@ -143,7 +143,7 @@ executable example-resizing-cells
   autogen-modules:
       Paths_monomer_hagrid
   hs-source-dirs:
-      example-resizing-cells
+      examples/resizing-cells
   default-extensions:
       DisambiguateRecordFields
       DuplicateRecordFields
