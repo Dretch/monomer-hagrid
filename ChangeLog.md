@@ -1,3 +1,7 @@
+## 0.3.1.2
+### Changed
+- Mark as compatible with Monomer 1.6.
+
 ## 0.3.1.1
 ### Fixed
 - Fixed a bug where row background color was determined by the original row index rather than the sorted index.

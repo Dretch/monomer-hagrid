@@ -155,6 +155,7 @@ mockRenderer = Renderer {
   renderArc = \center radius angleStart angleEnd winding -> return (),
   renderQuadTo = \p1 p2 -> return (),
   renderEllipse = \rect -> return (),
+  renderBezierTo = \p1 p2 p3 -> return (),
   -- Text
   renderText = mockRenderText,
 
@@ -200,7 +201,8 @@ mockWenv model = WidgetEnv {
   _weInTopLayer = const True,
   _weLayoutDirection = LayoutNone,
   _weViewport = Rect 0 0 testW testH,
-  _weOffset = def
+  _weOffset = def,
+  _weIsGhci = False
 }
 
 mockWenvEvtUnit :: s -> WidgetEnv s ()

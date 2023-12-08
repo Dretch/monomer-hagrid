@@ -5,15 +5,15 @@
 
 packages:
 - completed:
-    hackage: monomer-1.5.1.0@sha256:18e3ce60c7f5d3fae74bf5ace7515f0e252b12ccc4b71030f948e6fdc1f49a99,16741
+    hackage: monomer-1.6.0.0@sha256:ae58f6c6fcd859204002824ed11fe1e82bdcc3ac91c644b3978323788ea73e41,17371
     pantry-tree:
-      sha256: 3dde2b635d1298c3b734c0b28bae8fa4956bc2ad9ef89f81bbb04ec1eeb09d0c
-      size: 14513
+      sha256: 37c5a068ad8be8db1348328a036450cd0be98f0212d42e0b539fa37b35b98751
+      size: 15189
   original:
-    hackage: monomer-1.5.1.0
+    hackage: monomer-1.6.0.0
 snapshots:
 - completed:
-    sha256: 2e7d4a730d8eb5373b2d383fac84efcf7c81e3b7a5fce71b4c2e19a1768f25a6
-    size: 640239
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/21/6.yaml
-  original: lts-21.6
+    sha256: abcc4a65c15c7c2313f1a87f01bfd4d910516e1930b99653eef1d2d006515916
+    size: 640074
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/21/24.yaml
+  original: lts-21.24
