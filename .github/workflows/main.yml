@@ -20,7 +20,7 @@ jobs:
         path: ~/.stack
     
     - name: 'Install Stack'
-      uses: haskell/actions/setup@v2
+      uses: haskell-actions/setup@v2
       with:
         stack-setup-ghc: true
         enable-stack: true
